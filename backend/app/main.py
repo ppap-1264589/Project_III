@@ -313,19 +313,48 @@ def save_availability(payload: dict) -> dict:
             models.TeacherDateUnavailableSlot.date >= start,
             models.TeacherDateUnavailableSlot.date <= end,
         ))
-        valid = {(r.weekday, r.session, r.period_number) for r in session.scalars(select(models.TimeSlot)).all() if r.slot_type == "Tiết học"}
+        valid = {(weekday_index(r.weekday), r.session, r.period_number)
+                for r in session.scalars(select(models.TimeSlot)).all() if r.slot_type == "Tiết học"}
         for item in busy:
             day, session_name, period = item.split("|")
             day_value = date.fromisoformat(day)
-            if not start <= day_value <= end or (day_value.strftime("%A"), session_name, int(period)) not in valid:
-                # Weekday labels in Excel are localized, so validate session/period only.
-                if not start <= day_value <= end or not any(s == session_name and p == int(period) for _, s, p in valid):
-                    raise HTTPException(status_code=422, detail="Khung giờ bận không hợp lệ.")
+            if not start <= day_value <= end or (day_value.weekday(), session_name, int(period)) not in valid:
+                raise HTTPException(status_code=422, detail="Khung giờ bận không hợp lệ.")
             session.add(models.TeacherDateUnavailableSlot(teacher_id=teacher_id, date=day_value, session=session_name, period_number=int(period)))
     return {"saved": True}
 
 
 from .solver import solve_week, weekday_index
+@app.get("/busy-overview", include_in_schema=False)
+def busy_overview_page():
+    return FileResponse(Path(__file__).resolve().parent / "static" / "busy.html")
+
+
+@app.get("/api/availability/overview")
+def availability_overview(week_start: date) -> dict:
+    monday = week_start - timedelta(days=week_start.weekday())
+    end = monday + timedelta(days=6)
+    with SessionLocal() as session:
+        teachers = session.scalars(select(models.Teacher).order_by(models.Teacher.id)).all()
+        dated: dict[str, list[str]] = {}
+        for r in session.scalars(select(models.TeacherDateUnavailableSlot).where(
+                models.TeacherDateUnavailableSlot.date >= monday,
+                models.TeacherDateUnavailableSlot.date <= end)):
+            dated.setdefault(r.teacher_id, []).append(f"{r.date.isoformat()}|{r.session}|{r.period_number}")
+        recurring: dict[str, list[str]] = {}
+        for r in session.scalars(select(models.TeacherUnavailableSlot)):
+            idx = weekday_index(r.weekday)
+            if idx is not None:
+                day = (monday + timedelta(days=idx)).isoformat()
+                recurring.setdefault(r.teacher_id, []).append(f"{day}|{r.session}|{r.period_number}")
+        holidays = [h.date.isoformat() for h in session.scalars(select(models.SchoolHoliday))
+                    if monday <= h.date <= end]
+    return {"week_start": monday.isoformat(), "week_end": end.isoformat(),
+            "teachers": [{"id": t.id, "name": t.display_name} for t in teachers],
+            "dated_busy": dated, "recurring_busy": recurring, "holidays": holidays}
+
+from .solver import solve_week, weekday_index
+
 @app.post("/api/solve")
 def solve(payload: dict) -> dict:
     raw = payload.get("week_start")
