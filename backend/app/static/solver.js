@@ -206,6 +206,16 @@ function scheduleTableHtml(schedule) {
     `<th>Lớp</th><th>Môn</th><th>Giáo viên</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
+// Số tiết mỗi giáo viên nhận được sau khi bộ giải tự chọn giáo viên.
+function loadsTableHtml(loads) {
+  const rows = Object.entries(loads || {})
+    .map(([id, n]) => `<tr><td>${esc(id)}</td><td>${n}</td></tr>`).join("");
+  return rows
+    ? '<h3>Tải tiết của giáo viên (do thuật toán phân)</h3><div class="grid-wrap"><table><thead><tr>' +
+      `<th>Giáo viên</th><th>Số tiết/tuần</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    : "";
+}
+
 function listHtml(items) {
   return items && items.length ? "<ul>" + items.map((p) => `<li>${esc(p)}</li>`).join("") + "</ul>" : "";
 }
@@ -232,6 +242,7 @@ async function solve() {
     box.innerHTML =
       `Tìm được ${data.schedule.length} tiết (${esc(data.status)}).` +
       listHtml(data.warnings) +
+      loadsTableHtml(data.stats && data.stats.teacher_loads) +
       scheduleTableHtml(data.schedule);
   } catch (error) {
     box.className = "status bad";
