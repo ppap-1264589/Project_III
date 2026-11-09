@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from ortools.sat.python import cp_model
 
 from . import models
 from .database import Base, DATA_DIR, SessionLocal, engine
@@ -326,40 +325,13 @@ def save_availability(payload: dict) -> dict:
     return {"saved": True}
 
 
+from .solver import solve_week, weekday_index
 @app.post("/api/solve")
 def solve(payload: dict) -> dict:
-    week_start = date.fromisoformat(payload.get("week_start")) if payload.get("week_start") else None
+    raw = payload.get("week_start")
+    try:
+        week_start = date.fromisoformat(raw) if raw else None
+    except ValueError:
+        raise HTTPException(status_code=422, detail="week_start phải có dạng YYYY-MM-DD.")
     with SessionLocal() as session:
-        teachers = session.scalars(select(models.Teacher)).all()
-        assignments = session.scalars(select(models.TeachingAssignment)).all()
-        slots = [s for s in session.scalars(select(models.TimeSlot)) if s.slot_type == "Tiết học"]
-        unavailable = {(r.teacher_id, r.weekday, r.session, r.period_number) for r in session.scalars(select(models.TeacherUnavailableSlot))}
-        date_unavailable = set()
-        if week_start:
-            dates = [week_start + timedelta(days=i) for i in range(7)]
-            date_unavailable = {(r.teacher_id, r.date, r.session, r.period_number) for r in session.scalars(select(models.TeacherDateUnavailableSlot).where(models.TeacherDateUnavailableSlot.date >= dates[0], models.TeacherDateUnavailableSlot.date <= dates[-1]))}
-        holidays = {r.date for r in session.scalars(select(models.SchoolHoliday))}
-        demand = {(r.class_id, r.subject_id): r.periods_per_week for r in session.scalars(select(models.ClassSubjectDemand))}
-        classes = {r.id: r.name for r in session.scalars(select(models.SchoolClass))}
-        subjects = {r.id: r.name for r in session.scalars(select(models.Subject))}
-        names = {r.id: r.display_name for r in teachers}
-        weekday_labels = {0: ("thứ hai", "thu hai", "monday"), 1: ("thứ ba", "thu ba", "tuesday"), 2: ("thứ tư", "thu tu", "wednesday"), 3: ("thứ năm", "thu nam", "thursday"), 4: ("thứ sáu", "thu sau", "friday"), 5: ("thứ bảy", "thu bay", "saturday"), 6: ("chủ nhật", "chu nhat", "sunday")}
-    # Solve a weekly pattern. Dated blocks apply to the selected week; holidays block all teaching that date.
-    model = cp_model.CpModel(); variables = {}; by_class_slot = {}; by_teacher_slot = {}
-    for a in assignments:
-        for s in slots:
-            if (a.teacher_id, s.weekday, s.session, s.period_number) in unavailable: continue
-            if week_start and any((a.teacher_id, d, s.session, s.period_number) in date_unavailable and s.weekday.lower() in weekday_labels[d.weekday()] for i in range(7) for d in [week_start + timedelta(days=i)]): continue
-            if week_start and any(s.weekday.lower() in weekday_labels[h.weekday()] for h in holidays if week_start <= h < week_start + timedelta(days=7)): continue
-            key=(a.id,s.id); v=model.NewBoolVar("x_"+a.id+"_"+s.id); variables[key]=(v,a,s)
-            by_class_slot.setdefault((a.class_id,s.id),[]).append(v); by_teacher_slot.setdefault((a.teacher_id,s.id),[]).append(v)
-    for a in assignments:
-        model.Add(sum(v for (aid,_),(v,aa,s) in variables.items() if aid==a.id)==a.periods_per_week)
-    for vs in [*by_class_slot.values(),*by_teacher_slot.values()]: model.Add(sum(vs)<=1)
-    solver=cp_model.CpSolver(); solver.parameters.max_time_in_seconds=10
-    status=solver.Solve(model)
-    if status not in (cp_model.OPTIMAL,cp_model.FEASIBLE): return {"status":"infeasible","message":"Không tìm được lịch thỏa các ràng buộc. Hãy kiểm tra số tiết, giờ bận và khung giờ."}
-    result=[]
-    for (aid,sid),(v,a,s) in variables.items():
-        if solver.Value(v): result.append({"class_id":a.class_id,"class":classes[a.class_id],"subject_id":a.subject_id,"subject":subjects[a.subject_id],"teacher_id":a.teacher_id,"teacher":names[a.teacher_id],"weekday":s.weekday,"session":s.session,"period":s.period_number,"slot_id":sid})
-    return {"status":"optimal" if status==cp_model.OPTIMAL else "feasible","schedule":result}
+        return solve_week(session, week_start)
