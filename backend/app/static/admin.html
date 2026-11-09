@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nhập và chỉnh sửa dữ liệu - Project 3</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/admin.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>Nhập và chỉnh sửa dữ liệu</h1>
+    <p>Chế độ quản trị cục bộ · Các bảng lưu vào SQLite trên máy này</p>
+  </header>
+  <main>
+    <section>
+      <div class="admin-toolbar">
+        <div>
+          <h2>Bảng dữ liệu nghiệp vụ</h2>
+          <p class="muted">Chọn bảng, sửa từng ô như bảng tính, thêm hoặc xóa dòng. Bấm lưu để kiểm tra toàn bộ rồi ghi vào database.</p>
+          <p class="muted">“Phân công tham khảo” chỉ dùng để đối chiếu dữ liệu mẫu; thuật toán tương lai sẽ tự tìm cách phân giáo viên từ nhu cầu lớp-môn. Trong “Cấu hình học kỳ”, nhập ngày bắt đầu và số tuần; ngày kết thúc được tính tự động. Thêm từng ngày nghỉ theo ngày cụ thể trong năm ở bảng “Ngày nghỉ cố định”; có thể khai báo cả ngày nằm ngoài học kỳ.</p>
+        </div>
+        <a class="button-link" href="/">Nhập bằng Excel</a>
+      </div>
+      <div class="admin-controls">
+        <label for="tableSelect">Bảng</label>
+        <select id="tableSelect"></select>
+        <button id="addRow" class="secondary">Thêm dòng</button>
+        <button id="reloadData" class="secondary">Tải lại từ database</button>
+        <button id="saveData">Kiểm tra và lưu</button>
+      </div>
+      <div id="status" class="status">Đang tải dữ liệu...</div>
+      <div id="issues"></div>
+      <div id="gridWrap" class="grid-wrap"></div>
+    </section>
+  </main>
+  <footer>Hiện chưa có tài khoản đăng nhập. Trang này dành cho quản trị viên trên máy đang chạy ứng dụng.</footer>
+</body>
+</html>

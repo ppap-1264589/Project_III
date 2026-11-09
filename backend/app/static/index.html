@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project 3 - Thời khóa biểu</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header><h1>Quản lý dữ liệu thời khóa biểu</h1><p>Project 3 · Nhập Excel, kiểm tra và lưu vào SQLite trên máy này</p></header>
+  <main><div class="grid">
+    <section>
+      <div class="admin-toolbar"><h2>Nhập dữ liệu Excel</h2><div><a class="button-link" href="/admin">Nhập/chỉnh sửa trên lưới</a> <a class="button-link" href="/solver">Giờ bận &amp; bộ giải</a></div></div>
+      <p class="muted">Kiểm tra file trước khi lưu. Khi xác nhận, toàn bộ dữ liệu đang có sẽ được thay bằng dữ liệu trong file. “Phân công tham khảo” chỉ dùng để so sánh với nhu cầu; nó không phải kết quả của thuật toán.</p>
+      <input id="file" type="file" accept=".xlsx">
+      <div class="row"><button id="check">Kiểm tra file</button><button id="save" class="secondary" disabled>Xác nhận lưu dữ liệu</button></div>
+      <div id="result" class="status">Chưa có file được kiểm tra.</div><div id="issues"></div>
+    </section>
+    <section>
+      <h2>Mức tiết dạy tối thiểu</h2>
+      <p class="muted">Mức này hiện dùng để cảnh báo tải theo phân công tham khảo. Mở bộ giải để tạo lịch thử nghiệm theo phân công, khung giờ và giờ giáo viên bận.</p>
+      <div class="row"><label for="minimum">Số tiết mỗi tuần</label><input id="minimum" type="number" min="0" max="40"><button id="saveSetting">Lưu mức</button></div>
+      <div id="settingMessage" class="muted"></div>
+      <h2 class="section-heading">Học kỳ đang cấu hình</h2>
+      <div id="calendarSummary" class="muted">Chưa có cấu hình học kỳ.</div>
+      <p class="muted">Chỉnh ngày bắt đầu, số tuần và các ngày nghỉ tại bảng “Cấu hình học kỳ” / “Ngày nghỉ cố định” trên <a href="/admin">lưới nhập liệu</a>.</p>
+      <h2 class="section-heading">Dữ liệu đã lưu</h2><div id="counts" class="counts"></div><div id="teachers"></div>
+    </section>
+  </div></main>
+  <footer>Truy bài và tiết sinh hoạt lớp cuối chiều thứ Sáu là hoạt động, không tính là tiết dạy. Cơ sở dữ liệu nằm trong backend/data/timetable.db.</footer>
+</body>
+</html>
