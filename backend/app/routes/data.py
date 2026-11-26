@@ -13,6 +13,8 @@ from ..database import SessionLocal
 from ..db_io import MINIMUM_KEY, get_minimum, read_all, replace_all
 from ..excel_import import SHEETS, parse_and_validate, validate_tables
 
+import re
+
 router = APIRouter(prefix="/api")
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -146,6 +148,32 @@ def get_admin_data() -> dict:
         }
 
 
+# Bảng -> (cột mã, tiền tố) cho những bảng mà mã do hệ thống tự sinh.
+AUTO_ID = {
+    "Lop": ("lop_id", "CLS-"),
+    "Mon": ("mon_id", "SUB-"),
+}
+
+
+def fill_auto_ids(tables: dict) -> None:
+    """Dòng nào để trống mã thì sinh mã tiếp theo: CLS-01, CLS-02, ... (không trùng mã đang có)."""
+    for sheet, (column, prefix) in AUTO_ID.items():
+        rows = tables[sheet]
+        used = {str(row.get(column) or "").strip() for row in rows}
+        pattern = re.compile(rf"^{re.escape(prefix)}(\d+)$")
+        numbers = [int(m.group(1)) for value in used if (m := pattern.match(value))]
+        next_number = max(numbers, default=0) + 1
+        for row in rows:
+            if str(row.get(column) or "").strip():
+                continue
+            while f"{prefix}{next_number:02d}" in used:
+                next_number += 1
+            row[column] = f"{prefix}{next_number:02d}"
+            used.add(row[column])
+            next_number += 1
+
+
+
 @router.put("/admin/data")
 def save_admin_data(payload: dict) -> dict:
     tables = payload.get("tables")
@@ -155,6 +183,7 @@ def save_admin_data(payload: dict) -> dict:
         if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
             raise HTTPException(status_code=422, detail=f"Bảng {name} phải là danh sách các dòng dữ liệu.")
 
+    fill_auto_ids(tables)
     with SessionLocal() as session:
         minimum = get_minimum(session)
     validation = validate_tables(tables, minimum)

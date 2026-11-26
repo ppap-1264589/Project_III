@@ -44,6 +44,13 @@ const sheetLabels = {
   KhungGio:"Khung giờ học", GV_Ban:"Giờ giáo viên không thể dạy",
   HocKy:"Cấu hình học kỳ", NgayNghi:"Ngày nghỉ cố định",
 };
+// Cột do hệ thống tự sinh: không hiện trong lưới, không cho nhập tay.
+const hiddenColumns = {
+  Lop: ["lop_id"],
+  Mon: ["mon_id"],
+};
+const visibleColumns = (table) =>
+  (tableColumns[table] || []).filter((col) => !(hiddenColumns[table] || []).includes(col));
 let dataSet = {};
 let tableColumns = {};
 let activeTable = null;
@@ -91,7 +98,7 @@ async function loadData() {
 
 function renderGrid() {
   activeTable = byId("tableSelect").value;
-  const cols = tableColumns[activeTable] || [];
+  const cols = visibleColumns(activeTable);
   const rows = dataSet[activeTable] || [];
   let html = '<table class="edit-grid"><thead><tr>';
   for (const col of cols) html += "<th>" + escapeHtml(columns[col] || col) + "</th>";
@@ -99,7 +106,7 @@ function renderGrid() {
   rows.forEach((row, rowIndex) => {
     html += "<tr>";
     for (const col of cols) {
-      const inputType = (col === "ngay_bat_dau" || col === "ngay") ? "date" : "text";
+      const inputType = (col === "ngay_bat_dau" || col === "ngay") ? "date" : (col === "khoi" ? "number" : "text");
       html += '<td><input type="' + inputType + '" aria-label="' + escapeHtml(columns[col] || col) + '" data-row="' + rowIndex +
         '" data-column="' + escapeHtml(col) + '" value="' + escapeHtml(row[col] ?? "") + '"></td>';
     }
@@ -136,14 +143,44 @@ byId("tableSelect").addEventListener("change", () => {
   renderGrid();
 });
 
-byId("addRow").addEventListener("click", () => {
+byId("gridWrap").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || event.isComposing) return;   // isComposing: không chặn Enter khi đang gõ Telex/VNI
+  const input = event.target.closest("input[data-row]");
+  if (!input) return;
+  event.preventDefault();
+
+  const rows = dataSet[activeTable];
+  const row = Number(input.dataset.row);
+
+  if (row < rows.length - 1) {                 // còn dòng dưới: xuống cùng cột
+    focusCell(row + 1, input.dataset.column);
+    return;
+  }
+  captureVisibleInputs();                      // đang ở dòng cuối
+  const cols = visibleColumns(activeTable);
+  const lastIsBlank = cols.every((c) => String(rows[row][c] ?? "").trim() === "");
+  if (lastIsBlank) return;                     // dòng cuối còn trống thì không thêm dòng trống nữa
+  addBlankRow();
+  focusCell(rows.length - 1, cols[0]);         // dòng mới: nhảy vào ô đầu tiên
+});
+
+function addBlankRow() {
   captureVisibleInputs();
   const blank = {};
   for (const column of tableColumns[activeTable]) blank[column] = "";
   dataSet[activeTable].push(blank);
   renderGrid();
-  const inputs = byId("gridWrap").querySelectorAll("tbody tr:last-child input");
-  if (inputs.length) inputs[0].focus();
+}
+
+function focusCell(row, column) {
+  const input = byId("gridWrap").querySelector(
+    'input[data-row="' + row + '"][data-column="' + column + '"]');
+  if (input) { input.focus(); input.select?.(); }
+}
+
+byId("addRow").addEventListener("click", () => {
+  addBlankRow();
+  focusCell(dataSet[activeTable].length - 1, visibleColumns(activeTable)[0]);
 });
 
 byId("reloadData").addEventListener("click", () => {
