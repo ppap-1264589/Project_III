@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Xếp thời khóa biểu</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/timetable.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>Xếp thời khóa biểu cả học kỳ</h1>
+    <p>Bộ giải CP-SAT xếp một tuần mẫu rồi áp dụng cho mọi tuần của học kỳ</p>
+  </header>
+  <main>
+    <section>
+      <div class="admin-toolbar">
+        <div>
+          <h2>Tạo thời khóa biểu</h2>
+          <p class="muted">Dùng nhu cầu lớp-môn, chuyên môn giáo viên, khung giờ và giờ bận hằng tuần. Các tiết rơi vào ngày nghỉ sẽ bị bỏ (không xếp bù).</p>
+        </div>
+        <div>
+          <a class="button-link" href="/busy">Giờ bận</a>
+          <a class="button-link" href="/">Nhập Excel</a>
+          <button id="solve">Tạo thời khóa biểu</button>
+        </div>
+      </div>
+      <div id="result" class="status">Chưa chạy bộ giải.</div>
+    </section>
+    <section id="detail" hidden>
+      <h2>Tải tiết của giáo viên (mỗi tuần)</h2>
+      <div id="loads" class="grid-wrap"></div>
+      <h2 class="section-heading">Thời khóa biểu theo tuần</h2>
+      <div class="admin-controls">
+        <label for="weekSelect">Tuần</label>
+        <select id="weekSelect"></select>
+      </div>
+      <div id="lessons" class="grid-wrap"></div>
+    </section>
+  </main>
+</body>
+</html>

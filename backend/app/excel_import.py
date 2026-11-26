@@ -5,7 +5,7 @@ from io import BytesIO
 import datetime as dt
 from typing import Any
 
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.utils.datetime import from_excel
 
 
@@ -303,3 +303,20 @@ def parse_and_validate(content: bytes, min_periods: int = DEFAULT_MIN_TEACHING_P
             for table, rows in parsed.items()
         },
     }
+
+
+def validate_tables(tables: dict[str, list[dict]], min_periods: int = DEFAULT_MIN_TEACHING_PERIODS_PER_WEEK) -> dict:
+    """Kiểm tra dữ liệu sửa trên lưới: ghi tạm thành workbook rồi dùng lại parse_and_validate."""
+    workbook = Workbook()
+    workbook.remove(workbook.active)
+    for sheet_name, columns in SHEETS.items():
+        sheet = workbook.create_sheet(sheet_name)
+        for col, name in enumerate(columns, start=1):
+            sheet.cell(HEADER_ROW, col, name)
+        for row_number, row in enumerate(tables[sheet_name], start=HEADER_ROW + 1):
+            for col, name in enumerate(columns, start=1):
+                sheet.cell(row_number, col, row.get(name))
+    stream = BytesIO()
+    workbook.save(stream)
+    workbook.close()
+    return parse_and_validate(stream.getvalue(), min_periods)

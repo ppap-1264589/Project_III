@@ -49,12 +49,8 @@ async function refreshData() {
   byId("counts").innerHTML = Object.entries(summary.counts).map(([name, count]) =>
     '<div class="metric"><b>' + count + "</b><span>" + escapeHtml(name.replaceAll("_", " ")) + "</span></div>",
   ).join("");
-  byId("calendarSummary").textContent = summary.semester
-    ? summary.semester.name + " · " + summary.semester.start_date + " đến " + summary.semester.end_date +
-      " · " + summary.semester.duration_weeks + " tuần · " + summary.holiday_count + " ngày nghỉ đã khai báo"
-    : "Chưa có cấu hình học kỳ. Mở lưới nhập liệu để thêm một dòng cấu hình.";
   byId("teachers").innerHTML = teachers.length
-    ? "<p class=\"muted\">Số tiết dưới đây lấy từ bảng Phân công tham khảo, chưa phải kết quả thuật toán.</p><table><thead><tr><th>Giáo viên</th><th>Tiết trong dữ liệu tham khảo</th></tr></thead><tbody>" +
+    ? "<table><thead><tr><th>Giáo viên</th><th>Số tiết</th></tr></thead><tbody>" +
       teachers.map((teacher) => "<tr><td>" + escapeHtml(teacher.id) + " · " + escapeHtml(teacher.name) +
         "</td><td>" + teacher.assigned_periods + "</td></tr>").join("") + "</tbody></table>"
     : '<p class="muted">Chưa có giáo viên trong cơ sở dữ liệu.</p>';

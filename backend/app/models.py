@@ -85,16 +85,6 @@ class TeacherUnavailableSlot(Base):
     period_number: Mapped[int] = mapped_column("tiet_so", Integer, primary_key=True)
     note: Mapped[str] = mapped_column("ghi_chu", String(300), nullable=False, default="")
 
-
-class TeacherDateUnavailableSlot(Base):
-    """One-off teacher unavailability for a specific calendar date."""
-    __tablename__ = "teacher_date_unavailable_slots"
-    teacher_id: Mapped[str] = mapped_column(ForeignKey("teachers.giao_vien_id", ondelete="CASCADE"), primary_key=True)
-    date: Mapped[dt.date] = mapped_column(Date, primary_key=True)
-    session: Mapped[str] = mapped_column("buoi", String(20), primary_key=True)
-    period_number: Mapped[int] = mapped_column("tiet_so", Integer, primary_key=True)
-
-
 class AppSetting(Base):
     __tablename__ = "app_settings"
     key: Mapped[str] = mapped_column(String(80), primary_key=True)
