@@ -1,0 +1,46 @@
+export const labels = {
+  Lop: "Lớp",
+  Mon: "Môn học",
+  GiaoVien: "Giáo viên",
+  GV_Mon: "Môn giáo viên có thể dạy",
+  NhuCau: "Nhu cầu tiết học",
+  PhanCong: "Phân công tham khảo (dữ liệu mẫu)",
+  KhungGio: "Khung giờ học",
+  GV_Ban: "Giờ giáo viên không thể dạy",
+  HocKy: "Cấu hình học kỳ",
+  NgayNghi: "Ngày nghỉ cố định",
+};
+export const columns = {
+  lop_id: "Mã lớp", ten_lop: "Tên lớp", khoi: "Khối",
+  mon_id: "Mã môn", ten_mon: "Tên môn",
+  giao_vien_id: "Mã giáo viên", ten_hien_thi: "Tên hiển thị",
+  phan_cong_id: "Mã phân công", so_tiet_tuan: "Số tiết/tuần",
+  khung_gio_id: "Mã khung giờ", thu: "Thứ", buoi: "Buổi", tiet_so: "Tiết",
+  gio_bat_dau: "Giờ bắt đầu", thoi_luong_phut: "Thời lượng (phút)",
+  nghi_sau_tiet_phut: "Nghỉ sau tiết (phút)", loai_khung: "Loại khung", ghi_chu: "Ghi chú",
+  hoc_ky_id: "Mã học kỳ", ten_hoc_ky: "Tên học kỳ", ngay_bat_dau: "Ngày bắt đầu",
+  so_tuan: "Số tuần", ngay_nghi_id: "Mã ngày nghỉ", ngay: "Ngày nghỉ", ten_ngay_nghi: "Tên ngày nghỉ",
+};
+export const issueTitles = {
+  UNKNOWN_CLASS: "Không tìm thấy lớp",
+  UNKNOWN_SUBJECT: "Không tìm thấy môn học",
+  UNKNOWN_TEACHER: "Không tìm thấy giáo viên",
+  TEACHER_NOT_QUALIFIED: "Giáo viên chưa được khai báo dạy môn này",
+  INVALID_PERIOD_COUNT: "Số tiết không hợp lệ",
+  REFERENCE_ASSIGNMENT_MISMATCH: "Phân công tham khảo khác nhu cầu",
+  UNKNOWN_TIME_SLOT: "Khung giờ bận không khớp thời khóa biểu",
+  DUPLICATE_PRIMARY_KEY: "Mã định danh bị trùng",
+  REQUIRED_VALUE_MISSING: "Thiếu dữ liệu bắt buộc",
+  REFERENCE_TEACHER_LOAD_BELOW_MIN: "Tải tiết trong phân công tham khảo còn thấp",
+  SEMESTER_ROW_COUNT: "Cần một cấu hình học kỳ",
+  INVALID_SEMESTER_START_DATE: "Ngày bắt đầu học kỳ chưa hợp lệ",
+  INVALID_SEMESTER_WEEKS: "Số tuần học kỳ chưa hợp lệ",
+  INVALID_HOLIDAY_DATE: "Ngày nghỉ chưa hợp lệ",
+  HOLIDAY_OUTSIDE_SEMESTER: "Ngày nghỉ nằm ngoài học kỳ",
+};
+export const sheetLabels = {
+  Lop:"Lớp", Mon:"Môn học", GiaoVien:"Giáo viên", GV_Mon:"Môn giáo viên có thể dạy",
+  NhuCau:"Nhu cầu tiết học", PhanCong:"Phân công tham khảo",
+  KhungGio:"Khung giờ học", GV_Ban:"Giờ giáo viên không thể dạy",
+  HocKy:"Cấu hình học kỳ", NgayNghi:"Ngày nghỉ cố định",
+};

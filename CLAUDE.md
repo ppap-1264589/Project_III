@@ -2,69 +2,70 @@
 
 ## Purpose and handoff
 
-This repository contains a Vietnamese, local web application for importing school timetable data, validating it, editing it in a grid, recording teacher unavailability, and generating a weekly timetable. It is a student project for a lower secondary school (THCS). Treat the workbook's school data and all sample names/dates as synthetic demonstration data, not real school records or official curriculum requirements.
+Vietnamese, local web application for a lower secondary school (THCS) timetable: import school data from Excel, validate it, edit it in the browser, record teacher busy slots, and generate a timetable for the whole semester. It is a student project. Treat all school data, names and dates in the sample workbook as synthetic demonstration data, not real school records or official curriculum requirements.
 
-Use this file as the starting context when working in this repository. The README and planning document are useful companion references. Preserve the Vietnamese UI and existing workbook/API field names unless the user requests a change.
+Use this file as starting context. Preserve the Vietnamese UI and the existing workbook/API field names unless the user asks for a change. The user (Hoang) works in Vietnamese; reply in Vietnamese. Code changes are usually given as snippets for the user to paste, and have only been checked manually in the browser, not by automated tests.
 
-## Current implementation
+## Stack and layout
 
-- Backend: Python 3.10+, FastAPI, SQLAlchemy, SQLite, OpenPyXL, OR-Tools CP-SAT.
-- Frontend: plain HTML/CSS/JavaScript under `backend/app/static`; no frontend build step.
-- `backend/app/main.py`: API routes, Excel preview/confirm import, admin table editing, teacher date availability, and weekly solver.
-- `backend/app/excel_import.py`: workbook schema and validation (headers, required cells, duplicate keys, references, qualified subjects, positive periods, slot validity, semester, holidays, and reference-load warnings).
-- `backend/app/models.py`: SQLAlchemy entities. `backend/app/database.py` creates `backend/data/timetable.db` and enables SQLite foreign keys.
-- `normalize_workbook.mjs`: generates a synthetic sample workbook using `@oai/artifact-tool`; its output path is currently hard-coded to the original developer's Windows path. It may need adapting before reuse elsewhere.
-- `Bảng nhu cầu lịch học - học kỳ.xlsx`: current sample input workbook. `outputs/20261106-project3-sample/` contains another generated sample.
-- `Kế hoạch thực hiện Project 3.docx`: original project scope and phased plan.
-- `backend/data/timetable.db` is runtime state and is ignored by Git. Python `__pycache__` files are incidental and should not be treated as source.
+- Backend: Python 3.10+, FastAPI, SQLAlchemy, SQLite, OpenPyXL, OR-Tools CP-SAT. Frontend: plain HTML/CSS/JS in `backend/app/static`, no build step.
+- `backend/app/main.py`: app setup, page routes (`/`, `/admin`, `/busy`, `/timetable`), startup DB init and the default minimum-periods setting.
+- `backend/app/routes/excel.py`: Excel preview and confirm.
+- `backend/app/routes/data.py`: admin table load/save/clear, settings, summary, teacher list. Contains `AUTO_ID` and `fill_auto_ids`.
+- `backend/app/routes/busy.py`: recurring weekly teacher busy slots (`GV_Ban`), plus `/api/slots`.
+- `backend/app/routes/timetable.py`: `/api/solve` (loads DB, calls solver, expands to semester).
+- `backend/app/solver.py`: CP-SAT model for one sample week; no database access.
+- `backend/app/calendar_expand.py`: replicates the sample week across the semester and drops lessons on holidays.
+- `backend/app/db_io.py`: sheet-to-model mapping (`TABLES`, parent tables first), `replace_all`, `read_all`, `get_minimum`.
+- `backend/app/excel_import.py`: workbook reader. `input_schema.py` defines `SHEETS`, and `input_validation.py` checks the parsed tables. `backend/app/models.py`, `database.py`, `helpers.py` (Vietnamese weekday/session helpers).
+- Static pages: `index.html`/`app.js` (Excel import), `admin.html`/`admin.js` (grid editing), `busy.html`/`busy.js`, `timetable.html`/`timetable.js`, shared `app.css`.
+- `normalize_workbook.mjs` generates the synthetic sample workbook with `@oai/artifact-tool`; its output path is hard-coded to the original developer's Windows path. `Bảng nhu cầu lịch học - học kỳ.xlsx` is the current sample input. `Kế hoạch thực hiện Project 3.docx` is the original plan.
+- `backend/data/timetable.db` is runtime state (Git-ignored). `__pycache__` is incidental.
 
-## Run locally on Windows
+## Run locally (Windows)
 
-From repository root, run `backend\\run.bat`. It creates `backend/.venv` if needed, installs `backend/requirements.txt`, then runs Uvicorn with reload. Requires Python 3.10+. Open:
-
-- `/` — upload/preview/confirm Excel workbook
-- `/admin` — edit the workbook tables in a grid
-- `/solver` — set date-specific teacher busy slots and solve the selected week
-- `/docs` — FastAPI API docs
-- `/health` — health check
-
-SQLite is created automatically at `backend/data/timetable.db`. The minimum teacher-period setting is stored in `app_settings`, defaults to 19, and is preserved when imported/admin data tables are replaced.
+From the repo root run `backend\run.bat` (creates `backend/.venv`, installs `requirements.txt`, runs Uvicorn with reload). Pages: `/` import Excel, `/admin` grid editing, `/busy` weekly busy slots, `/timetable` solve and view by week, `/docs` API docs, `/health`. If port 8000 is blocked (`WinError 10013`), kill the process holding it (`netstat -ano | findstr :8000`, `taskkill /PID ... /F`), restart WinNAT as admin (`net stop winnat`, `net start winnat`), or change `--port` in `run.bat`. A `pause` at the end of `run.bat` helps when the window closes on errors.
 
 ## Workbook contract
 
-The required sheets are `Lop`, `Mon`, `GiaoVien`, `GV_Mon`, `NhuCau`, `PhanCong`, `KhungGio`, `GV_Ban`, `HocKy`, and `NgayNghi`. Headers are on row 4 and data begins at row 5. `Doc huong dan` and `KiemTraInput` are explanatory/check sheets and are not imported as business tables. Sheet/column names are defined by `SHEETS` in `backend/app/excel_import.py`.
+Required sheets: `Lop`, `Mon`, `GiaoVien`, `GV_Mon`, `NhuCau`, `PhanCong`, `KhungGio`, `GV_Ban`, `HocKy`, `NgayNghi`. Headers on row 4, data from row 5. `Doc huong dan` and `KiemTraInput` are explanatory sheets and are not imported. Column names are defined by `SHEETS` in `input_schema.py`.
 
-IDs are strings (examples: `CLS-6A`, `SUB-MATH`, `TCH-MATH-01`). Foreign-key relationships should use IDs, never display labels. `GV_Mon` declares teacher qualifications. `NhuCau` is weekly class-subject demand. `PhanCong` is explicitly treated as a reference assignment table in the current app, despite also being used as solver input. `KhungGio` distinguishes `Tiết học` from `Hoạt động`; activities such as truy bài and Friday homeroom should not count as teaching periods. `HocKy` must contain exactly one row; holidays are specific dates.
+IDs are strings (`CLS-6A`, `SUB-MATH`, `TCH-MATH-01`); foreign keys always use IDs, never display names. `GV_Mon` = teacher qualifications. `NhuCau` = weekly periods per class-subject. `PhanCong` = reference assignment table only (a mismatch with `NhuCau` is a warning, and it is not a solver input). `KhungGio` has `Tiết học` (teaching) and `Hoạt động` (truy bài, Friday homeroom; not teaching periods). `HocKy` must have exactly one row; `NgayNghi` holds specific holiday dates.
 
-The sample workbook represents 16 classes (grades 6–9, sections A–D), 10 subjects, 11 synthetic teachers, 160 demand rows, and 27 periods/class/week (432 total). The timetable has Monday–Friday, 5 morning teaching periods and 4 afternoon periods, plus activity slots. Demo semester values and holidays are illustrative and should be changed for any real scenario.
+Sample data: 16 classes (grades 6-9, sections A-D), 10 subjects, 11 synthetic teachers, 160 demand rows, 27 periods per class per week. Monday-Friday, 5 morning and 4 afternoon teaching periods plus activity slots. Demo semester dates and holidays are illustrative.
 
-## Solver behavior and important gaps
+## Data semantics
 
-The current `/api/solve` builds CP-SAT Boolean choices from `TeachingAssignment` (`PhanCong`) rows and `KhungGio` rows where `loai_khung == "Tiết học"`. It enforces the specified assignment count for each assignment row and at most one lesson per class and per teacher in each slot. It blocks recurring `GV_Ban` slots, date-specific teacher blocks for the selected week, and holiday dates that fall in that selected week. The solver has a 10-second time limit and returns a schedule or a generic infeasible response.
+- Excel upload: `.xlsx` only, max 10 MB. The preview is held in memory for 20 minutes; only a valid preview gets a token. Confirm replaces all input tables in one transaction and keeps app settings (minimum periods per teacher, default 19, stored in `app_settings`).
+- Admin save validates all tables together (by writing a temporary workbook and reusing `parse_and_validate`), then replaces them transactionally. Warnings do not block saving; errors do.
+- Busy slots are recurring weekly (`GV_Ban`, key = weekday + session + period). There is no date-specific availability in the current code.
 
-Do not describe the following as implemented requirements:
+## Solver (current behavior)
 
-- The project plan calls for exactly 19 teaching periods per teacher, with feasibility diagnostics. Current setting only warns when imported/reference assignment load is below a configurable minimum (default 19); it does not constrain CP-SAT to exactly 19 or report per-teacher solver loads.
-- The plan expects the solver to expand `NhuCau` into lesson requests. Current solver instead schedules `PhanCong` rows; loaded `NhuCau` is currently unused in the solve constraints. This makes the distinction between reference assignments and algorithm inputs an important design issue to resolve.
-- Current solver checks class/teacher collisions and unavailable slots but does not enforce that each assigned teacher is qualified for that subject at solve time (Excel/admin validation checks reference rows).
-- No optimization objectives are applied (e.g. avoid subject clustering, reduce gaps), and there is no independent post-solve verifier or detailed conflict explanation.
-- Semester duration is reported/validated, but the solver generates a weekly pattern. Holidays are only blocked when a `week_start` is supplied and a holiday falls in that selected 7-day window; the semester is not expanded into a semester calendar.
-- The plan mentions viewing by class/teacher, locked lessons, unscheduled lessons, CSV/print export, and richer diagnostics. These are not present in the current `/solver` flow.
+`/api/solve` builds a CP-SAT model from `NhuCau`, `GV_Mon`, `KhungGio` (only `Tiết học`) and `GV_Ban`. For each (class, subject) it chooses exactly one qualified teacher who teaches all the periods; at most one lesson per class and per teacher per slot; busy slots are excluded. It solves one sample week, then `calendar_expand.py` replicates it over the semester and drops lessons on holidays (no make-up). Pre-solve checks report subjects with no qualified teacher and class load above the number of slots. Result statuses: optimal/feasible, infeasible, timeout, error. Per-teacher weekly loads are returned; teachers below the minimum only produce warnings.
 
-These are candidate next steps, not a mandate to change scope. Confirm which source should be authoritative (`NhuCau` plus teacher-selection logic vs. fixed `PhanCong`) before changing the solver model.
+Not implemented (do not describe as done): exactly 19 periods per teacher; richer infeasibility diagnostics; optimization objectives (gaps, same-subject clustering, late periods); an independent post-solve verifier; per-class/per-teacher views, locked lessons, unscheduled lessons, CSV/print export; date-specific availability; holiday make-up. The planning document expects the hard constraints above; if data cannot satisfy them, report infeasibility rather than silently relaxing constraints.
 
-## Data validation and update semantics
+## Admin UI (`/admin`) progress
 
-Excel upload is limited to `.xlsx` and 10 MB. Preview is held in process memory for 20 minutes; only a valid preview gets a token. Confirm replaces all timetable input tables in a database transaction while retaining application settings. Admin save validates the complete set of tables before replacing them transactionally. Warnings (including reference assignment mismatch and load below minimum) do not make a workbook invalid; validation errors do.
+Done:
+- Auto-generated IDs on save for `Lop` (`CLS-nn`), `Mon` (`SUB-nn`), `GiaoVien` (`TCH-nn`) via `fill_auto_ids`, called in `save_admin_data` before validation. Existing IDs are kept. Lop and Mon ID columns are hidden; the GiaoVien ID is shown read-only (read-only is enforced in the UI only, not in the backend).
+- `GV_Mon`: custom view with the teacher shown as "id - name"; subjects added with a `+` picker from `Mon`, one per line, sorted A-Z. Rows that point to deleted teachers/subjects are pruned before saving.
+- `NhuCau`: custom matrix view (rows = classes sorted by grade then name, columns = subjects sorted A-Z, cell = periods per week, blank/0 = no row, row totals). It still saves as `lop_id, mon_id, so_tiet_tuan` rows, so the backend and solver are unchanged. Invalid cells (not an integer 0-40) block saving.
+- Enter moves down a row (and adds a row at the end of a normal grid); "Thêm dòng" still works. New teachers/classes/subjects must be saved once to get IDs before they appear in `GV_Mon`/`NhuCau`.
+- `admin.js` coordinates loading, saving, and switching views. In `static/admin/`, `table-grid.js` manages normal editable tables, `teacher-subjects.js` manages `GV_Mon`, and `demand-matrix.js` manages `NhuCau`. Styles are in `app.css`.
 
-Availability on `/solver` is stored per teacher/date/session/period. Saving a selected week replaces that teacher's date-specific busy entries only within that week. Recurring `GV_Ban` remains a separate weekly rule.
+Next candidates:
+- `PhanCong`: use name-based dropdowns, or hide it (it is reference data only).
+- Name-based selection in the remaining tables (`GV_Ban`, etc.) and hide IDs everywhere.
+- Backend rejection of changed teacher IDs.
+- Decide whether `NhuCau` plus teacher choice by the solver, or a fixed `PhanCong`, is the authority (the solver currently uses `NhuCau`).
+- Solver improvements listed above; automated tests.
 
-## Project principles and workflow
+## Principles and workflow
 
-The planning doc prioritizes hard constraints: no class/teacher double booking, qualified teachers, unavailable slots respected, all required periods scheduled, and exactly 19 weekly teaching periods per teacher. If the data cannot satisfy hard requirements, report infeasibility rather than silently relaxing constraints. Suggested quality goals (after validity is stable) include reducing teacher gaps, avoiding repeated same-day subjects, and avoiding late periods.
+Hard constraints first: no class/teacher double booking, qualified teachers, busy slots respected, all required periods scheduled, then the 19-period rule. Quality goals come after validity. The intended user is a timetable administrator; staff review the result. Keep demo data clearly labeled as hypothetical. When changing behavior, check the workbook contract and both the Excel import and admin validation paths, and update the README and UI copy.
 
-The intended audience is a timetable administrator. The app supports decisions; school staff remain responsible for reviewing the result. Keep demo data clearly labeled as hypothetical. When implementing, check the affected workbook contract and both Excel import and admin validation paths, and update README/UI copy if behavior changes.
+## Repository state
 
-## Repository state and verification caveat
-
-At handoff, the workspace did not expose a Git repository (`git status`/`git log` returned “not a git repository”), so there is no verified commit history or clean/dirty status to report. No automated test suite was found in the visible file list. No test suite was run while preparing this memory. Use focused checks when the user requests verification or when a code change needs validation.
+At the last handoff the workspace was not a Git repository and no automated test suite existed. Check `git status` before assuming anything about history.
