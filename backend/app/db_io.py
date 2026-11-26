@@ -5,7 +5,7 @@ from sqlalchemy import delete, inspect, select
 from sqlalchemy.orm import Session
 
 from . import models
-from .excel_import import DEFAULT_MIN_TEACHING_PERIODS_PER_WEEK
+from .input_schema import DEFAULT_MIN_TEACHING_PERIODS_PER_WEEK
 
 MINIMUM_KEY = "minimum_periods_per_teacher"
 
