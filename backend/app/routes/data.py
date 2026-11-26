@@ -152,6 +152,7 @@ def get_admin_data() -> dict:
 AUTO_ID = {
     "Lop": ("lop_id", "CLS-"),
     "Mon": ("mon_id", "SUB-"),
+    "GiaoVien": ("giao_vien_id", "TCH-"),
 }
 
 

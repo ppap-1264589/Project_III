@@ -49,6 +49,11 @@ const hiddenColumns = {
   Lop: ["lop_id"],
   Mon: ["mon_id"],
 };
+
+const readonlyColumns = { GiaoVien: ["giao_vien_id"] };   // hiện nhưng không cho sửa
+const isReadonly = (table, col) => (readonlyColumns[table] || []).includes(col);
+const editableColumns = (table) => visibleColumns(table).filter((col) => !isReadonly(table, col));
+
 const visibleColumns = (table) =>
   (tableColumns[table] || []).filter((col) => !(hiddenColumns[table] || []).includes(col));
 let dataSet = {};
@@ -107,8 +112,11 @@ function renderGrid() {
     html += "<tr>";
     for (const col of cols) {
       const inputType = (col === "ngay_bat_dau" || col === "ngay") ? "date" : (col === "khoi" ? "number" : "text");
+      const locked = isReadonly(activeTable, col);
       html += '<td><input type="' + inputType + '" aria-label="' + escapeHtml(columns[col] || col) + '" data-row="' + rowIndex +
-        '" data-column="' + escapeHtml(col) + '" value="' + escapeHtml(row[col] ?? "") + '"></td>';
+        '" data-column="' + escapeHtml(col) + '"' +
+        (locked ? ' readonly tabindex="-1" placeholder="Tự sinh khi lưu"' : "") +
+        ' value="' + escapeHtml(row[col] ?? "") + '"></td>';
     }
     html += '<td><button type="button" class="delete-row" data-delete-row="' + rowIndex + '">Xóa</button></td></tr>';
   });
@@ -157,11 +165,12 @@ byId("gridWrap").addEventListener("keydown", (event) => {
     return;
   }
   captureVisibleInputs();                      // đang ở dòng cuối
-  const cols = visibleColumns(activeTable);
+
+  const cols = editableColumns(activeTable);
   const lastIsBlank = cols.every((c) => String(rows[row][c] ?? "").trim() === "");
-  if (lastIsBlank) return;                     // dòng cuối còn trống thì không thêm dòng trống nữa
+  if (lastIsBlank) return;
   addBlankRow();
-  focusCell(rows.length - 1, cols[0]);         // dòng mới: nhảy vào ô đầu tiên
+  focusCell(rows.length - 1, cols[0]);
 });
 
 function addBlankRow() {
@@ -180,7 +189,8 @@ function focusCell(row, column) {
 
 byId("addRow").addEventListener("click", () => {
   addBlankRow();
-  focusCell(dataSet[activeTable].length - 1, visibleColumns(activeTable)[0]);
+  // handler nút "Thêm dòng"
+  focusCell(dataSet[activeTable].length - 1, editableColumns(activeTable)[0]);
 });
 
 byId("reloadData").addEventListener("click", () => {
