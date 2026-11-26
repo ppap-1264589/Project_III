@@ -24,7 +24,7 @@ def solve_timetable(
     slots,            # [{"id", "weekday", "session", "period"}] chỉ "Tiết học" (KhungGio)
     busy,             # {(teacher_id, weekday, session, period)}             (GV_Ban)
     teacher_names, class_names, subject_names,   # {id: tên} để hiện thông báo cho dễ đọc
-    min_periods=0,    # chỉ để cảnh báo, không phải ràng buộc
+    min_periods=0,  # số tiết tối thiểu mỗi giáo viên trong tuần mẫu
     time_limit=30.0,
     workers=8,
 ):
@@ -46,7 +46,26 @@ def solve_timetable(
     }
 
     # Bước 3: kiểm tra nhanh để báo lỗi dễ hiểu trước khi giải
+    all_teachers = sorted(teacher_names.keys() | free_slots.keys())
     problems = []
+    total_periods = sum(demands.values())
+    minimum_total = len(all_teachers) * min_periods
+    if total_periods < minimum_total:
+        problems.append(
+            f"Tổng nhu cầu là {total_periods} tiết/tuần. "
+            f"Để {len(all_teachers)} giáo viên đều dạy ít nhất {min_periods} tiết/tuần, "
+            f"cần ít nhất {minimum_total} tiết/tuần."
+        )
+    if min_periods > 0:
+        for teacher_id in all_teachers:
+            available = len(free_slots.get(teacher_id, ()))
+            if available < min_periods:
+                name = teacher_names.get(teacher_id, teacher_id)
+                reason = (
+                    f"chỉ có {available} khung giờ dạy còn trống"
+                    if teacher_id in free_slots else "chưa được khai báo môn có thể dạy"
+                )
+                problems.append(f"Giáo viên {name} {reason}, nên không thể đạt {min_periods} tiết/tuần.")
     class_load = defaultdict(int)
     for (class_id, subject_id), periods in demands.items():
         class_load[class_id] += periods
@@ -64,16 +83,16 @@ def solve_timetable(
     # Bước 4: dựng mô hình CP-SAT
     model = cp_model.CpModel()
     lessons = []                          # (biến, lớp, môn, giáo viên, khung)
-    picks = []                            # để tránh biến mất tham chiếu (không bắt buộc)
     in_class_slot = defaultdict(list)     # (lớp, khung)       -> các biến cùng ô
     in_teacher_slot = defaultdict(list)   # (giáo viên, khung) -> các biến cùng ô
 
+    teacher_periods = defaultdict(list)
     for (class_id, subject_id), periods in sorted(demands.items()):
         options = []
         for teacher_id in teachers_of[subject_id]:
             pick = model.NewBoolVar(f"pick_{class_id}_{subject_id}_{teacher_id}")  # 1 nếu chọn giáo viên này
             options.append(pick)
-            picks.append(pick)
+            teacher_periods[teacher_id].append(periods * pick)
             here = []
             for slot in free_slots[teacher_id]:
                 x = model.NewBoolVar(f"x_{class_id}_{subject_id}_{teacher_id}_{slot['id']}")  # 1 nếu dạy ở khung này
@@ -87,6 +106,10 @@ def solve_timetable(
 
     for group in [*in_class_slot.values(), *in_teacher_slot.values()]:
         model.AddAtMostOne(group)     # không trùng tiết
+
+    if min_periods > 0:
+        for teacher_id in all_teachers:
+            model.Add(sum(teacher_periods[teacher_id]) >= min_periods)
 
     # Bước 5: giải
     solver = cp_model.CpSolver()
@@ -118,13 +141,10 @@ def solve_timetable(
     for row in schedule:
         loads[row.pop("_t")] += 1
     # giáo viên không được chọn dạy lớp nào vẫn hiện với 0 tiết
-    all_teachers = sorted({t for t, _ in qualified})
     teacher_loads = [{"teacher_id": t, "teacher": teacher_names.get(t, t), "periods": loads[t]} for t in all_teachers]
 
-    warnings = [f"{r['teacher']} chỉ có {r['periods']} tiết/tuần, thấp hơn mức tối thiểu {min_periods}."
-                for r in teacher_loads if r["periods"] < min_periods]
     return {
         "status": "optimal" if status == cp_model.OPTIMAL else "feasible",
         "message": f"Đã xếp {len(schedule)} tiết cho một tuần mẫu.",
-        "schedule": schedule, "teacher_loads": teacher_loads, "problems": [], "warnings": warnings,
+        "schedule": schedule, "teacher_loads": teacher_loads, "problems": [], "warnings": [],
     }

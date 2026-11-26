@@ -1,4 +1,5 @@
 import { escapeHtml } from "./helpers.js";
+import { confirmDelete } from "./table-grid.js?v=delete-layout";
 
 // Bỏ các dòng GV_Mon trỏ tới giáo viên/môn không còn trong bảng cha.
 export function pruneTeacherSubjects(tables) {
@@ -20,7 +21,7 @@ export function renderTeacherSubjects(wrap, tables) {
     ? '<p class="muted empty-grid">Có ' + unsaved + ' giáo viên/môn mới chưa có mã nên chưa hiện ở đây. Hãy bấm “Kiểm tra và lưu” trước.</p>'
     : "";
 
-  html += '<table class="edit-grid"><thead><tr><th>Giáo viên</th><th>Môn có thể dạy</th></tr></thead><tbody>';
+  html += '<table class="edit-grid teacher-subjects-grid"><thead><tr><th>Giáo viên</th><th>Môn có thể dạy</th><th>Thao tác</th></tr></thead><tbody>';
   for (const t of teachers) {
     const mine = tables.GV_Mon.filter((r) => r.giao_vien_id === t.giao_vien_id).map((r) => r.mon_id);
     const rest = sortIds(subjects.map((s) => s.mon_id).filter((id) => !mine.includes(id)));
@@ -31,6 +32,7 @@ export function renderTeacherSubjects(wrap, tables) {
         '<button type="button" class="delete-row" data-remove-subject="' + escapeHtml(t.giao_vien_id) +
         '" data-subject="' + escapeHtml(id) + '" aria-label="Bỏ môn">×</button></div>';
     }
+    html += "</td><td>";
     if (rest.length) {
       html += '<button type="button" class="secondary add-subject-btn" data-add-for="' + escapeHtml(t.giao_vien_id) + '">+</button>' +
         '<select class="subject-picker" data-teacher="' + escapeHtml(t.giao_vien_id) + '" hidden>' +
@@ -47,6 +49,7 @@ export function renderTeacherSubjects(wrap, tables) {
   wrap.onclick = (event) => {
     const remove = event.target.closest("[data-remove-subject]");
     if (remove) {
+      if (!confirmDelete(remove)) return;
       tables.GV_Mon = tables.GV_Mon.filter((r) =>
         !(r.giao_vien_id === remove.dataset.removeSubject && r.mon_id === remove.dataset.subject));
       renderTeacherSubjects(wrap, tables);
