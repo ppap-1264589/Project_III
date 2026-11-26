@@ -5,13 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Prj 3 - Phần mềm quản lý TKB</title>
   <link rel="stylesheet" href="/static/app.css">
-  <script src="/static/app.js" defer></script>
+  <script src="/static/app.js?v=summary-counts" defer></script>
 </head>
 <body>
-  <header><h1>Phần mềm quản lý thời khóa biểu</h1></header>
+  <header><h1>Trang chủ - Phần mềm quản lý thời khóa biểu</h1></header>
   <main><div class="grid">
     <section>
-      <div class="admin-toolbar"><h2>Nhập dữ liệu Excel</h2><div><a class="button-link" href="/admin">Nhập/chỉnh sửa trên lưới</a> <a class="button-link" href="/busy">Giờ bận</a> <a class="button-link" href="/timetable">Xếp lịch</a>
+      <div class="admin-toolbar">
+        <h2>Nhập dữ liệu Excel</h2>
+        <div>
+          <a class="button-link" href="/admin">Quản trị dữ liệu</a>
+          <a class="button-link" href="/timetable">Xếp lịch</a>
+        </div>
+      </div>
       <p class="muted">Bước 1: Chọn file Excel và bấm “Kiểm tra file”.</p>
       <p class="muted">Bước 2: Nếu không có lỗi, bấm “Xác nhận lưu dữ liệu”.</p>
       <p class="muted">Lưu ý: Dữ liệu hiện có sẽ bị thay bằng nội dung file này.</p>

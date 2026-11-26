@@ -43,13 +43,25 @@ const sheetNames = {
   NgayNghi: "Ngày nghỉ cố định", Workbook: "Toàn bộ tệp",
 };
 
+const countLabels = {
+  classes: "Lớp",
+  subjects: "Môn học",
+  teachers: "Giáo viên",
+  teacher_subjects: "Môn giáo viên có thể dạy",
+  demands: "Nhu cầu tiết học",
+  time_slots: "Khung giờ học",
+  teacher_unavailable_slots: "Giờ giáo viên không thể dạy",
+  school_holidays: "Ngày nghỉ của trường",
+};
+
 async function refreshData() {
   const responses = await Promise.all([fetch("/api/settings"), fetch("/api/data/summary"), fetch("/api/teachers")]);
   if (responses.some((response) => !response.ok)) return;
   const [settings, summary, teachers] = await Promise.all(responses.map((response) => response.json()));
   byId("minimum").value = settings.minimum_periods_per_teacher;
-  byId("counts").innerHTML = Object.entries(summary.counts).map(([name, count]) =>
-    '<div class="metric"><b>' + count + "</b><span>" + escapeHtml(name.replaceAll("_", " ")) + "</span></div>",
+  const counts = Object.entries(summary.counts).filter(([name]) => name !== "reference_assignments");
+  byId("counts").innerHTML = counts.map(([name, count]) =>
+    '<div class="metric"><b>' + count + "</b><span>" + escapeHtml(countLabels[name] ?? name.replaceAll("_", " ")) + "</span></div>",
   ).join("");
   byId("teachers").innerHTML = teachers.length
     ? "<table><thead><tr><th>Giáo viên</th><th>Số tiết</th></tr></thead><tbody>" +

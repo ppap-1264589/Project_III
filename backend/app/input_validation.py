@@ -134,7 +134,8 @@ def _validate_demands_and_assignments(parsed, issues):
             if teacher_id in teacher_load:
                 teacher_load[teacher_id] += count
 
-    for key in sorted(set(demand_totals) | set(assigned_totals)):
+    comparison_keys = demand_totals.keys() | assigned_totals.keys() if parsed["PhanCong"] else ()
+    for key in sorted(comparison_keys):
         needed, assigned = demand_totals.get(key, 0), assigned_totals.get(key, 0)
         if needed != assigned:
             issues.append(make_issue("REFERENCE_ASSIGNMENT_MISMATCH", f"Dữ liệu phân công tham khảo của lớp {key[0]}, môn {key[1]} là {assigned} tiết, trong khi nhu cầu là {needed}. Thuật toán sẽ dùng nhu cầu lớp-môn làm đầu vào.", "PhanCong", severity="warning"))
@@ -210,7 +211,8 @@ def _validate_semester_and_holidays(parsed, issues):
         except (TypeError, ValueError):
             holiday_date = None
         if not isinstance(holiday_date, dt.date):
-            issues.append(make_issue("INVALID_HOLIDAY_DATE", "Ngày nghỉ phải là ngày hợp lệ.", "NgayNghi", row_index, "ngay"))
+            message = "Chưa nhập ngày nghỉ." if raw_date is None or raw_date == "" else "Ngày nghỉ không tồn tại hoặc sai định dạng."
+            issues.append(make_issue("INVALID_HOLIDAY_DATE", message, "NgayNghi", row_index, "ngay"))
 
     return semester_start, semester_end
 
@@ -222,7 +224,7 @@ def validate_input(parsed, issues: list[Issue], min_periods: int) -> dict[str, A
 
     warnings: list[Issue] = [item for item in issues if item.severity == "warning"]
     for teacher_id, load in sorted(teacher_load.items()):
-        if load < min_periods:
+        if parsed["PhanCong"] and load < min_periods:
             warnings.append(make_issue(
                 "REFERENCE_TEACHER_LOAD_BELOW_MIN",
                 f"Dữ liệu phân công tham khảo của {teacher_id} có {load} tiết; mức tối thiểu đang cấu hình là {min_periods}. Đây chưa phải tải từ kết quả thuật toán.",

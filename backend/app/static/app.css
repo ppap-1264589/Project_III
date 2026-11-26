@@ -12,6 +12,27 @@ button{padding:10px 14px;border:0;border-radius:7px;background:#1e5d92;color:#ff
 button.secondary{background:#e7eef5;color:#214563}button:disabled{opacity:.5;cursor:not-allowed}
 .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .admin-toolbar,.admin-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.edit-grid.teacher-subjects-grid{width:min(100%,44rem);table-layout:fixed}
+.teacher-subjects-grid th:first-child{width:34%}
+.teacher-subjects-grid th:last-child{width:24%}
+.teacher-subjects-grid .subject-picker{max-width:100%}
+.teacher-subjects-grid tbody td{padding:12px;vertical-align:top;overflow-wrap:anywhere}
+.teacher-subjects-grid tbody tr:nth-child(even){background:#f1f5f9}
+.teacher-subjects-grid .subject-line{max-width:24rem;gap:8px;margin-bottom:5px}
+.teacher-subjects-grid .delete-row{flex-shrink:0}
+#gridWrap .delete-row{box-sizing:border-box;inline-size:8rem;min-block-size:2rem;padding-inline:6px;white-space:nowrap}
+#gridWrap .delete-row.is-confirming-delete,#clearTable.is-confirming-delete{background:#b42318;color:#fff}
+#gridWrap tr:has([data-delete-row].is-confirming-delete) td,#gridWrap .subject-line:has(.is-confirming-delete){background:#fff1ef}
+#clearTable{box-sizing:border-box;inline-size:13rem;min-block-size:2.25rem}
+.edit-grid input[data-semester-date]{width:min(100%,9rem);margin-right:6px}
+.semester-calendar{position:relative;display:inline-block}
+#destructiveActions > summary{cursor:pointer}
+.demand-matrix .demand-selected:not(.invalid){background:#e6f1ff;box-shadow:inset 0 0 0 2px #3575bc}
+.demand-matrix .demand-class{background:transparent;color:inherit;padding:4px 6px;text-align:left}
+.demand-matrix .demand-class:hover{background:#e6f1ff}
+.demand-copy-menu{position:fixed;inset:auto;margin:0;padding:5px;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 4px 15px #182c4833;max-width:calc(100vw - 12px)}
+.demand-feedback:empty{display:none}
+.semester-calendar input[data-calendar]{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none}
 .admin-controls{justify-content:flex-start;margin:16px 0}
 .admin-controls select{min-width:220px;padding:10px;border:1px solid #cbd7e4;border-radius:7px;background:#fff}
 .button-link{display:inline-block;padding:10px 14px;border-radius:7px;background:#e7eef5;color:#214563;text-decoration:none;font-weight:600}

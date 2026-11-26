@@ -18,7 +18,6 @@ Khi server khởi động, mở:
 
 - `http://127.0.0.1:8000/` để nhập Excel.
 - `http://127.0.0.1:8000/admin` để nhập và sửa dữ liệu trên giao diện.
-- `http://127.0.0.1:8000/busy` để đánh dấu giờ bận hằng tuần của giáo viên.
 - `http://127.0.0.1:8000/timetable` để chạy bộ giải và xem thời khóa biểu theo tuần.
 - `http://127.0.0.1:8000/docs` để xem tài liệu API dành cho phát triển.
 
@@ -34,13 +33,12 @@ Nếu gặp lỗi `WinError 10013` (cổng 8000 bị chặn hoặc đang đượ
   - Bảng môn giáo viên có thể dạy: chọn giáo viên dạng "mã - tên", thêm môn bằng nút `+` từ bảng Môn, mỗi môn một dòng, xếp theo bảng chữ cái.
   - Bảng nhu cầu tiết học: nhập dạng ma trận lớp x môn, có tổng số tiết/tuần của mỗi lớp.
   - Phím Enter xuống dòng hoặc xuống ô kế tiếp; nút "Thêm dòng" vẫn dùng được.
-- Trang `/busy`: đánh dấu giờ bận hằng tuần theo từng ô hoặc cả ngày.
 - Trang `/timetable`: bộ giải xếp một tuần mẫu rồi áp dụng cho cả học kỳ, xem theo tuần, hiển thị tải tiết của giáo viên.
 
 Chưa làm:
 
 - **Khung giờ** có bảng theo ngày. Bấm vùng trống để thêm tiết học (45 phút) hoặc truy bài (15 phút), Ctrl+bấm để chọn từng ô, Shift+bấm để chọn một vùng. Kéo ô đã chọn để di chuyển và xem trước giờ mới. Bấm chuột phải để chỉnh sửa, sao chép tới các ngày trong một khoảng hoặc xác nhận xóa.
-- **Giờ giáo viên không thể dạy** hiển thị cùng khung giờ với bảng Khung giờ học. Chọn giáo viên, rồi bấm vào một tiết hoặc tên ngày để đổi trạng thái bận hằng tuần. Tiết bận màu đỏ có dấu X, tiết có thể dạy màu xanh. Trang `/busy` dùng cùng giao diện.
+- **Giờ giáo viên không thể dạy** trong trang quản trị hiển thị cùng khung giờ với bảng Khung giờ học. Chọn giáo viên, rồi bấm vào một tiết hoặc tên ngày để đổi trạng thái bận hằng tuần. Tiết bận màu đỏ có dấu X, tiết có thể dạy màu xanh.
 - Các bảng Phân công tham khảo, Học kỳ, Ngày nghỉ ở `/admin` vẫn là lưới nhập thường (Phân công vẫn phải gõ tay mã lớp, môn, giáo viên).
 - Ẩn mã ở toàn bộ các bảng còn lại; chặn sửa mã giáo viên ở phía backend (hiện mới chặn ở giao diện).
 - Ràng buộc đúng 19 tiết cho mỗi giáo viên (hiện chỉ cảnh báo khi dưới mức tối thiểu), các mục tiêu tối ưu (giảm tiết trống, tránh lặp môn trong ngày...), xem theo lớp hoặc giáo viên, khóa tiết, xuất CSV/in.
@@ -51,7 +49,6 @@ Chưa làm:
 - `backend/app/main.py`: khởi tạo ứng dụng, các địa chỉ trang, khởi tạo database.
 - `backend/app/routes/excel.py`: API xem trước và xác nhận nhập Excel.
 - `backend/app/routes/data.py`: API sửa dữ liệu trên lưới, cài đặt, thống kê; sinh mã tự động cho Lớp, Môn, Giáo viên.
-- `backend/app/routes/busy.py`: API giờ bận hằng tuần của giáo viên.
 - `backend/app/routes/timetable.py`: API chạy bộ giải và nhân kết quả ra cả học kỳ.
 - `backend/app/solver.py`: bộ giải CP-SAT cho một tuần mẫu. Đầu vào là `NhuCau`, `GV_Mon`, `KhungGio` (chỉ loại `Tiết học`) và `GV_Ban`. Mỗi cặp lớp-môn được chọn đúng một giáo viên có chuyên môn; không trùng tiết của lớp hoặc giáo viên; tránh giờ bận.
 - `backend/app/calendar_expand.py`: nhân tuần mẫu ra các tuần của học kỳ, bỏ các tiết rơi vào ngày nghỉ (không xếp bù).
@@ -74,7 +71,7 @@ Backend cần các trang `Lop`, `Mon`, `GiaoVien`, `GV_Mon`, `NhuCau`, `PhanCong
 
 Mã dạng chữ như `TCH-01`, `CLS-6A` và `SUB-MATH` được dùng làm ID; các bảng liên kết luôn dùng ID, không dùng tên hiển thị. Giờ truy bài và sinh hoạt lớp có loại khung `Hoạt động`, không được tính vào tải giảng dạy. Mức tiết tối thiểu chỉnh ở giao diện và lưu trong database, mặc định là 19; hiện chỉ dùng để cảnh báo.
 
-Khi xác nhận Excel mới hoặc lưu từ `/admin`, các bảng dữ liệu thời khóa biểu được thay thế trong một transaction; cấu hình mức tiết được giữ nguyên. Giờ bận lưu ở `/busy` thuộc bảng `GV_Ban` nên cũng bị thay khi nhập dữ liệu mới.
+Khi xác nhận Excel mới hoặc lưu từ `/admin`, các bảng dữ liệu thời khóa biểu, kể cả giờ bận (`GV_Ban`), được thay thế trong một transaction; cấu hình mức tiết được giữ nguyên.
 
 ## Nhập và chỉnh sửa trên `/admin`
 

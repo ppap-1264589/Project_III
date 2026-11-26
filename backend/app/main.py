@@ -8,7 +8,7 @@ from . import models
 from .database import Base, SessionLocal, engine
 from .db_io import MINIMUM_KEY
 from .input_schema import DEFAULT_MIN_TEACHING_PERIODS_PER_WEEK
-from .routes import busy, data, excel, timetable
+from .routes import data, excel, timetable
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -16,14 +16,12 @@ app = FastAPI(title="Project 3 Timetable", description="Nhập dữ liệu và x
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.include_router(data.router)
 app.include_router(excel.router)
-app.include_router(busy.router)
 app.include_router(timetable.router)
 
 # Địa chỉ trang -> file HTML
 PAGES = {
     "/": "index.html",           # nhập Excel
     "/admin": "admin.html",      # sửa dữ liệu trên lưới
-    "/busy": "busy.html",        # đánh dấu giờ bận
     "/timetable": "timetable.html",  # xếp lịch
 }
 

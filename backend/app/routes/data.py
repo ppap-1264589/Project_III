@@ -133,7 +133,7 @@ def save_admin_data(payload: dict) -> dict:
             "message": "Có lỗi dữ liệu. Chưa lưu thay đổi.",
             "errors": validation["errors"], "warnings": validation["warnings"],
         })
-    save_tables(tables)
+    save_tables(validation["data"])
     return {"saved": True, "message": "Đã lưu các bảng dữ liệu vào cơ sở dữ liệu.", "warnings": validation["warnings"]}
 
 
