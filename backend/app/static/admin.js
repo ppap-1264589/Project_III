@@ -3,6 +3,7 @@ import { columns, issueTitles, labels, sheetLabels } from "./admin/labels.js";
 import { captureVisibleInputs, editableColumns, focusCell, renderTableGrid } from "./admin/table-grid.js";
 import { pruneTeacherSubjects, renderTeacherSubjects } from "./admin/teacher-subjects.js";
 import { pruneDemand, renderDemandMatrix } from "./admin/demand-matrix.js";
+import { pruneBusy, renderTimeSlots } from "./admin/time-slots.js";
 
 const gridWrap = byId("gridWrap");
 
@@ -38,12 +39,14 @@ async function loadData() {
 
 function renderGrid() {
   activeTable = byId("tableSelect").value;
-  gridWrap.onclick = gridWrap.onchange = gridWrap.oninput = gridWrap.onkeydown = null;
-  byId("addRow").hidden = activeTable === "GV_Mon" || activeTable === "NhuCau";
+  gridWrap.onclick = gridWrap.onchange = gridWrap.oninput = gridWrap.onkeydown = gridWrap.onpointerdown = null;
+  byId("addRow").hidden = ["GV_Mon", "NhuCau", "KhungGio"].includes(activeTable);
   if (activeTable === "GV_Mon") {
     renderTeacherSubjects(gridWrap, dataSet);
   } else if (activeTable === "NhuCau") {
     renderDemandMatrix(gridWrap, dataSet);
+  } else if (activeTable === "KhungGio") {
+    renderTimeSlots(gridWrap, dataSet);
   } else {
     renderTableGrid(gridWrap, activeTable, tableColumns, dataSet[activeTable] || []);
   }
@@ -97,6 +100,7 @@ byId("saveData").addEventListener("click", async () => {
   captureVisibleInputs(gridWrap, dataSet[activeTable]);
   pruneTeacherSubjects(dataSet);
   pruneDemand(dataSet);
+  const removedBusy = pruneBusy(dataSet);
   if (document.querySelector(".demand-cell.invalid")) {
     byId("status").className = "status bad";
     byId("status").textContent = "Có ô nhu cầu không hợp lệ (cần số nguyên từ 0 đến 40). Hãy sửa các ô viền đỏ.";
@@ -135,6 +139,10 @@ byId("saveData").addEventListener("click", async () => {
     byId("status").className = result.warnings?.length ? "status warn" : "status ok";
     byId("status").textContent = result.message + (result.warnings?.length ? " Có " + result.warnings.length + " cảnh báo về tải tiết." : "");
     await loadData();
+    if (removedBusy) {
+      byId("status").className = "status warn";
+      byId("status").textContent = result.message + " Đã bỏ " + removedBusy + " giờ bận không còn khớp khung giờ mới.";
+    }
   } catch (error) {
     byId("status").className = "status bad";
     byId("status").textContent = error.message;

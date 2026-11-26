@@ -75,3 +75,28 @@ button.danger{background:#c53d35;color:#fff}
 .demand-matrix .total{min-width:84px;text-align:center;font-weight:700;color:#173b5f;background:#f3f7fb;border-left:2px solid #dce5ef}
 .demand-matrix thead th:last-child{background:#e3ecf5}
 .demand-matrix tbody tr:hover td:not(.total){background:#f6fafe}
+
+
+/* ===== Khung giờ học (kéo thả) ===== */
+.ts-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:0 0 12px}
+.ts-tools label{font-size:13px;color:#617187}
+.ts-tools select,.ts-tools input,.ts-panel select,.ts-panel input{padding:7px;border:1px solid #cbd7e4;border-radius:6px}
+.ts-tools input[type=number]{width:72px}
+.ts-tool-btn{background:#e7eef5;color:#214563}
+.ts-tool-btn.active.lesson{background:#3c8dd0;color:#fff}
+.ts-tool-btn.active.activity{background:#f2a33a;color:#fff}
+.ts-board{display:flex;min-width:820px}
+.ts-axis{width:52px;flex:none;position:relative;margin-top:34px}
+.ts-axis span{position:absolute;right:6px;font-size:11px;color:#738196;transform:translateY(-50%)}
+.ts-col{flex:1;min-width:112px;border-left:1px solid #e1e8f0}
+.ts-head{height:34px;line-height:34px;text-align:center;font-weight:700;color:#173b5f;background:#edf3f8;position:sticky;top:0;z-index:3}
+.ts-lane{position:relative;touch-action:none;cursor:crosshair;background-image:linear-gradient(#e7edf3 1px,transparent 1px)}
+.ts-noon{position:absolute;left:0;right:0;border-top:2px dashed #9db1c7;pointer-events:none}
+.ts-block{position:absolute;left:4px;right:4px;padding:2px 6px;border-radius:6px;overflow:hidden;cursor:grab;font-size:12px;color:#fff;user-select:none;box-shadow:0 1px 3px #20304733}
+.ts-block.lesson{background:#3c8dd0}.ts-block.activity{background:#f2a33a}
+.ts-block.selected{outline:3px solid #173b5f;z-index:2}
+.ts-block small{display:block;font-weight:400;opacity:.9}
+.ts-handle{position:absolute;left:0;right:0;height:6px;cursor:ns-resize}
+.ts-handle.top{top:0}.ts-handle.bottom{bottom:0}
+.ts-ghost{position:absolute;left:4px;right:4px;background:#1e5d9255;border:1px dashed #1e5d92;border-radius:6px;pointer-events:none}
+.ts-panel{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:14px;padding:12px;border:1px solid #dce5ef;border-radius:8px;background:#f8fafc}

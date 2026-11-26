@@ -74,7 +74,7 @@ class TimeSlot(Base):
     break_after_minutes: Mapped[int] = mapped_column("nghi_sau_tiet_phut", Integer, nullable=False)
     slot_type: Mapped[str] = mapped_column("loai_khung", String(30), nullable=False)
     note: Mapped[str] = mapped_column("ghi_chu", String(300), nullable=False, default="")
-    __table_args__ = (UniqueConstraint("thu", "buoi", "tiet_so", name="uq_slot_day_session_period"),)
+    __table_args__ = (UniqueConstraint("thu", "buoi", "loai_khung", "tiet_so", name="uq_slot_day_session_kind_period"),)
 
 
 class TeacherUnavailableSlot(Base):

@@ -161,6 +161,22 @@ def _validate_time_slots(parsed, teacher_ids, issues):
         if key not in valid_slots:
             issues.append(make_issue("UNKNOWN_TIME_SLOT", "Khung bận không khớp một tiết học trong KhungGio.", "GV_Ban", row_index, "tiet_so"))
 
+    by_day: dict[str, list[tuple[int, int, int]]] = {}
+    for row_index, row in enumerate(parsed["KhungGio"], start=HEADER_ROW + 1):
+        try:
+            hour, minute = (int(part) for part in cell_text(row["gio_bat_dau"]).split(":")[:2])
+            begin = hour * 60 + minute
+            length = int(row["thoi_luong_phut"])
+        except (ValueError, TypeError):
+            issues.append(make_issue("INVALID_SLOT_TIME", "Giờ bắt đầu phải dạng HH:MM và thời lượng là số phút.", "KhungGio", row_index, "gio_bat_dau"))
+            continue
+        by_day.setdefault(cell_text(row["thu"]), []).append((begin, begin + length, row_index))
+    for day, spans in by_day.items():
+        spans.sort()
+        for (_, end1, row1), (start2, _, row2) in zip(spans, spans[1:]):
+            if start2 < end1:
+                issues.append(make_issue("SLOT_OVERLAP", f"{day}: dòng {row1} và dòng {row2} bị chồng giờ.", "KhungGio", row2, "gio_bat_dau"))
+
 def _validate_semester_and_holidays(parsed, issues):
     # Kiểm tra cấu hình học kỳ và định dạng ngày nghỉ.
     semester_rows = parsed["HocKy"]

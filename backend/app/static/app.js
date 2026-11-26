@@ -33,6 +33,8 @@ const issueTitles = {
   INVALID_SEMESTER_WEEKS: "Số tuần học kỳ chưa hợp lệ",
   INVALID_HOLIDAY_DATE: "Ngày nghỉ chưa hợp lệ",
   HOLIDAY_OUTSIDE_SEMESTER: "Ngày nghỉ nằm ngoài học kỳ",
+  SLOT_OVERLAP: "Khung giờ bị chồng nhau",
+  INVALID_SLOT_TIME: "Giờ bắt đầu hoặc thời lượng không hợp lệ",
 };
 const sheetNames = {
   Lop: "Lớp", Mon: "Môn", GiaoVien: "Giáo viên", GV_Mon: "Chuyên môn giáo viên",
