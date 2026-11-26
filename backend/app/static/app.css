@@ -43,3 +43,35 @@ footer{max-width:1080px;margin:20px auto;padding:0 20px 24px;color:#738196;font-
 .ov-cell.free{background:#e1f3e7}.ov-cell.busy{background:#e94d48;color:#fff;font-weight:800}.ov-cell.fixed{background:#f2a33a;color:#fff;font-weight:800}.ov-cell.hol,.ov-grid th.hol{background:#d5dbe3}
 button.danger{background:#c53d35;color:#fff}
 .edit-grid input[readonly]{background:#f1f4f8;color:#617187;cursor:not-allowed}
+.subject-line{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed #e1e8f0}
+.add-subject-btn{margin-top:6px;padding:4px 14px;font-size:16px}
+.subject-picker{margin-top:6px;padding:6px;border:1px solid #cbd7e4;border-radius:7px}
+.edit-grid.demand-matrix input{min-width:54px;width:64px;text-align:center}
+.matrix-note{margin:0;padding:12px 14px}
+
+.demand-matrix{width:auto;min-width:0;border-collapse:separate;border-spacing:0;margin:0}
+.demand-matrix th,.demand-matrix td{padding:6px 8px;border-bottom:1px solid #e7edf3}
+
+/* hàng tiêu đề: tên môn, căn giữa, được phép xuống dòng */
+.demand-matrix thead th{min-width:88px;max-width:130px;text-align:center;vertical-align:bottom;
+  white-space:normal;font-size:13px;color:#173b5f;background:#edf3f8}
+
+/* cột lớp cố định bên trái khi cuộn ngang */
+.demand-matrix thead th:first-child{left:0;z-index:3;text-align:left;min-width:72px}
+.demand-matrix tbody th{position:sticky;left:0;top:auto;z-index:2;min-width:72px;text-align:left;
+  white-space:nowrap;color:#173b5f;background:#f7fafd;border-right:2px solid #dce5ef}
+
+/* ô nhập số */
+.edit-grid.demand-matrix input{display:block;width:60px;min-width:0;margin:0 auto;padding:7px 4px;
+  text-align:center;font-size:14px;color:#203047;background:#f8fafc;border:1px solid #cbd7e4;border-radius:6px}
+.edit-grid.demand-matrix input::placeholder{color:#b6c2d0}
+.edit-grid.demand-matrix input:not(:placeholder-shown){background:#e8f2fb;border-color:#8fb9de;font-weight:600}
+.edit-grid.demand-matrix input:focus{background:#fff;outline:2px solid #4b8dc4;border-color:#4b8dc4}
+.demand-cell.invalid{border-color:#c53d35!important;background:#fff5f4!important}
+.demand-matrix input[type=number]{-moz-appearance:textfield}
+.demand-matrix input::-webkit-inner-spin-button,.demand-matrix input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+
+/* cột tổng */
+.demand-matrix .total{min-width:84px;text-align:center;font-weight:700;color:#173b5f;background:#f3f7fb;border-left:2px solid #dce5ef}
+.demand-matrix thead th:last-child{background:#e3ecf5}
+.demand-matrix tbody tr:hover td:not(.total){background:#f6fafe}
