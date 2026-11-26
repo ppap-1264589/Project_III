@@ -165,3 +165,12 @@ def save_admin_data(payload: dict) -> dict:
         })
     save_tables(tables)
     return {"saved": True, "message": "Đã lưu các bảng dữ liệu vào cơ sở dữ liệu.", "warnings": validation["warnings"]}
+
+
+@router.delete("/admin/data")
+def clear_all_data() -> dict:
+    """Xóa sạch mọi bảng dữ liệu đầu vào (Excel hoặc nhập tay). Cài đặt mức tiết tối thiểu được giữ nguyên."""
+    with SessionLocal.begin() as session:
+        replace_all(session, {name: [] for name in SHEETS})
+    PREVIEWS.clear()   # hủy luôn các bản xem trước Excel chưa xác nhận
+    return {"cleared": True, "message": "Đã xóa toàn bộ dữ liệu khỏi hệ thống."}

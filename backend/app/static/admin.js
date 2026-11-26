@@ -193,4 +193,43 @@ byId("saveData").addEventListener("click", async () => {
   }
 });
 
+
+let clearTimer = null;
+function disarmClear() {
+  clearTimeout(clearTimer);
+  clearTimer = null;
+  byId("clearData").textContent = "Xóa toàn bộ dữ liệu";
+}
+
+byId("clearData").addEventListener("click", async () => {
+  const button = byId("clearData");
+  if (!clearTimer) {   // lần bấm 1: chỉ cảnh báo
+    button.textContent = "Bấm lần nữa để XÓA TOÀN BỘ";
+    byId("status").className = "status warn";
+    byId("status").textContent = "Sắp xóa toàn bộ dữ liệu (lớp, môn, giáo viên, nhu cầu, khung giờ, giờ bận, học kỳ, ngày nghỉ). Không thể khôi phục. Bấm lại nút đỏ trong 5 giây để xác nhận.";
+    clearTimer = setTimeout(() => {
+      disarmClear();
+      byId("status").className = "status";
+      byId("status").textContent = "Đã hủy xóa dữ liệu.";
+    }, 5000);
+    return;
+  }
+  disarmClear();       // lần bấm 2: xóa thật
+  button.disabled = true;
+  byId("issues").innerHTML = "";
+  try {
+    const response = await fetch("/api/admin/data", { method: "DELETE" });
+    const result = await readResponse(response);
+    if (!response.ok) throw new Error(typeof result.detail === "string" ? result.detail : "Không thể xóa dữ liệu.");
+    await loadData();
+    byId("status").className = "status ok";
+    byId("status").textContent = result.message + " Các bảng hiện đang trống.";
+  } catch (error) {
+    byId("status").className = "status bad";
+    byId("status").textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
 loadData();
