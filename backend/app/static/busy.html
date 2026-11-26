@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Giờ bận của giáo viên</title>
   <link rel="stylesheet" href="/static/app.css">
-  <script src="/static/busy.js" defer></script>
+  <script type="module" src="/static/busy.js"></script>
 </head>
 <body>
   <header>
@@ -17,20 +17,15 @@
       <div class="admin-toolbar">
         <div>
           <h2>Giờ bận lặp lại hằng tuần</h2>
-          <p class="muted">Ô xanh là tiết học trong Excel. Bấm ô để chuyển thành đỏ (bận). Bấm tên thứ ở đầu cột để đánh dấu bận cả ngày (bấm lần nữa để bỏ). Chỉ lưu vào database khi bấm “Lưu giờ bận”.</p>
         </div>
         <div>
           <a class="button-link" href="/timetable">Xếp lịch</a>
-          <a class="button-link" href="/">Nhập Excel</a>
+          <a class="button-link" href="/admin">Quản trị dữ liệu</a>
         </div>
       </div>
-      <div class="admin-controls">
-        <label for="teacher">Giáo viên</label>
-        <select id="teacher"></select>
-        <button id="save">Lưu giờ bận</button>
-      </div>
+      <button id="save" type="button" disabled>Lưu giờ bận giáo viên đang chọn</button>
+      <div id="message" class="status" role="status">Đang tải dữ liệu...</div>
       <div id="calendar"></div>
-      <div id="message" class="status">Chưa có thay đổi.</div>
     </section>
   </main>
 </body>

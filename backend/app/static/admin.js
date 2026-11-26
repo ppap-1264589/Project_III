@@ -4,12 +4,14 @@ import { captureVisibleInputs, editableColumns, focusCell, renderTableGrid } fro
 import { pruneTeacherSubjects, renderTeacherSubjects } from "./admin/teacher-subjects.js";
 import { pruneDemand, renderDemandMatrix } from "./admin/demand-matrix.js";
 import { pruneBusy, renderTimeSlots } from "./admin/time-slots.js";
+import { renderTeacherBusy } from "./admin/teacher-busy.js";
 
 const gridWrap = byId("gridWrap");
 
 let dataSet = {};
 let tableColumns = {};
 let activeTable = null;
+let busyTeacher = "";
 
 async function loadData() {
   byId("status").className = "status";
@@ -40,13 +42,15 @@ async function loadData() {
 function renderGrid() {
   activeTable = byId("tableSelect").value;
   gridWrap.onclick = gridWrap.onchange = gridWrap.oninput = gridWrap.onkeydown = gridWrap.onpointerdown = null;
-  byId("addRow").hidden = ["GV_Mon", "NhuCau", "KhungGio"].includes(activeTable);
+  byId("addRow").hidden = ["GV_Mon", "NhuCau", "KhungGio", "GV_Ban"].includes(activeTable);
   if (activeTable === "GV_Mon") {
     renderTeacherSubjects(gridWrap, dataSet);
   } else if (activeTable === "NhuCau") {
     renderDemandMatrix(gridWrap, dataSet);
   } else if (activeTable === "KhungGio") {
     renderTimeSlots(gridWrap, dataSet);
+  } else if (activeTable === "GV_Ban") {
+    renderTeacherBusy(gridWrap, dataSet, busyTeacher, (teacherId) => { busyTeacher = teacherId; });
   } else {
     renderTableGrid(gridWrap, activeTable, tableColumns, dataSet[activeTable] || []);
   }

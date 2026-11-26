@@ -80,7 +80,7 @@ button.danger{background:#c53d35;color:#fff}
 /* ===== Khung giờ học (kéo thả) ===== */
 .ts-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:0 0 12px}
 .ts-tools label{font-size:13px;color:#617187}
-.ts-tools select,.ts-tools input,.ts-panel select,.ts-panel input{padding:7px;border:1px solid #cbd7e4;border-radius:6px}
+.ts-tools input,.ts-context select,.ts-context input{padding:7px;border:1px solid #cbd7e4;border-radius:6px}
 .ts-tools input[type=number]{width:72px}
 .ts-tool-btn{background:#e7eef5;color:#214563}
 .ts-tool-btn.active.lesson{background:#3c8dd0;color:#fff}
@@ -96,7 +96,32 @@ button.danger{background:#c53d35;color:#fff}
 .ts-block.lesson{background:#3c8dd0}.ts-block.activity{background:#f2a33a}
 .ts-block.selected{outline:3px solid #173b5f;z-index:2}
 .ts-block small{display:block;font-weight:400;opacity:.9}
+.ts-block.compact{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.ts-block.compact .ts-block-title{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ts-block.compact small{flex:none;font-size:10px}
 .ts-handle{position:absolute;left:0;right:0;height:6px;cursor:ns-resize}
 .ts-handle.top{top:0}.ts-handle.bottom{bottom:0}
-.ts-ghost{position:absolute;left:4px;right:4px;background:#1e5d9255;border:1px dashed #1e5d92;border-radius:6px;pointer-events:none}
-.ts-panel{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:14px;padding:12px;border:1px solid #dce5ef;border-radius:8px;background:#f8fafc}
+.ts-ghost{position:absolute;left:4px;right:4px;z-index:4;display:grid;place-items:center;background:#dbeeff;border:1px dashed #1e5d92;border-radius:6px;pointer-events:none;color:#173b5f;font-size:11px;font-weight:700;white-space:nowrap}
+.ts-ghost.invalid{background:#ffe3e3;border-color:#b33434;color:#832b2b}
+.ts-dragging .ts-block.selected{opacity:.42}
+.ts-hover,.ts-context{position:fixed;z-index:10;border-radius:8px;box-shadow:0 4px 14px #20304733}
+.ts-hover{padding:4px 8px;background:#173b5f;color:#fff;font-size:12px;pointer-events:none}
+.ts-context{display:grid;gap:7px;min-width:200px;max-width:calc(100vw - 8px);max-height:calc(100vh - 8px);overflow:auto;padding:10px;background:#fff;border:1px solid #cbd7e4;font-size:13px}
+.ts-context[hidden],.ts-hover[hidden]{display:none}
+.ts-context label{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ts-context input[type=number]{width:72px}
+.ts-context-error{margin:0;color:#832b2b;font-size:12px}
+.ts-context-error:empty{display:none}
+
+[data-busy-teacher]{min-width:180px;max-width:100%;padding:7px;border:1px solid #cbd7e4;border-radius:6px;background:#fff}
+.busy-timeline .ts-lane{cursor:default;touch-action:auto}
+.busy-day{width:100%;height:34px;padding:2px 3px;display:grid;align-content:center;gap:1px;
+  border-radius:0;background:#edf3f8;color:#173b5f;font-size:13px;line-height:1.1}
+.busy-day small{font-size:10px;font-weight:400}
+.busy-day[aria-pressed=true]{background:#ffdfdc;color:#8f2723}
+.busy-lesson{padding-right:22px;text-align:left;background:#dff3e5;color:#17633a;cursor:pointer}
+.busy-lesson[aria-pressed=true]{background:#ffdfdc;color:#8f2723}
+.busy-lesson:focus-visible,.busy-day:focus-visible{outline:2px solid #173b5f;outline-offset:-2px;z-index:2}
+.busy-mark{display:none;position:absolute;right:5px;top:50%;transform:translateY(-50%);font-weight:800}
+.busy-lesson[aria-pressed=true] .busy-mark{display:block}
+.busy-activity{background:#fff0d8;color:#805900;cursor:default}

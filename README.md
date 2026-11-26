@@ -39,7 +39,9 @@ Nếu gặp lỗi `WinError 10013` (cổng 8000 bị chặn hoặc đang đượ
 
 Chưa làm:
 
-- Các bảng Phân công tham khảo, Khung giờ, Giờ bận, Học kỳ, Ngày nghỉ ở `/admin` vẫn là lưới nhập thường (Phân công vẫn phải gõ tay mã lớp, môn, giáo viên).
+- **Khung giờ** có bảng theo ngày. Bấm vùng trống để thêm tiết học (45 phút) hoặc truy bài (15 phút), Ctrl+bấm để chọn từng ô, Shift+bấm để chọn một vùng. Kéo ô đã chọn để di chuyển và xem trước giờ mới. Bấm chuột phải để chỉnh sửa, sao chép tới các ngày trong một khoảng hoặc xác nhận xóa.
+- **Giờ giáo viên không thể dạy** hiển thị cùng khung giờ với bảng Khung giờ học. Chọn giáo viên, rồi bấm vào một tiết hoặc tên ngày để đổi trạng thái bận hằng tuần. Tiết bận màu đỏ có dấu X, tiết có thể dạy màu xanh. Trang `/busy` dùng cùng giao diện.
+- Các bảng Phân công tham khảo, Học kỳ, Ngày nghỉ ở `/admin` vẫn là lưới nhập thường (Phân công vẫn phải gõ tay mã lớp, môn, giáo viên).
 - Ẩn mã ở toàn bộ các bảng còn lại; chặn sửa mã giáo viên ở phía backend (hiện mới chặn ở giao diện).
 - Ràng buộc đúng 19 tiết cho mỗi giáo viên (hiện chỉ cảnh báo khi dưới mức tối thiểu), các mục tiêu tối ưu (giảm tiết trống, tránh lặp môn trong ngày...), xem theo lớp hoặc giáo viên, khóa tiết, xuất CSV/in.
 - Kiểm thử tự động (các thay đổi gần đây mới được kiểm tra thủ công trên trình duyệt).

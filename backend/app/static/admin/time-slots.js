@@ -1,273 +1,309 @@
 import { escapeHtml } from "./helpers.js";
+import { minuteAt, startSlotDrag, drawDragPreview } from "./time-slot-drag.js";
+import { renderWeeklyTimeline, timelineDays } from "./weekly-timeline.js";
+import {
+  DAYS, DAY_START, DAY_END, STEP, PPM, LESSON, ACTIVITY, DEFAULT_DURATION,
+  blockFromRow, blockTitle, numbering, placementError, snap, timeTop, timeRange,
+  toHHMM, toMin, toRows, typeClass, typeLabel,
+} from "./time-slot-data.js";
 
-const DAYS = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
-const DAY_START = 6 * 60, DAY_END = 18 * 60, NOON = 12 * 60, STEP = 5, PPM = 1.2; // PPM = pixel mỗi phút
-const TYPES = ["Tiết học", "Hoạt động"];
-const cls = (t) => (t === "Hoạt động" ? "activity" : "lesson");
+export { pruneBusy } from "./time-slot-data.js";
 
-let uid = 0, blocks = [], days = [], selected = null, tool = "Tiết học", defaultDur = 45;
-let message = "", wrapEl = null, tablesRef = null;
-let quick = { day: "ALL", start: "07:00", count: 5, dur: 45, brk: 5 };
-let copyFrom = "Thứ Hai";
+const TYPES = [LESSON, ACTIVITY];
+const durations = { ...DEFAULT_DURATION };
+let tool = LESSON;
 
-const toMin = (t) => { const [h, m] = String(t || "").split(":"); return (Number(h) || 0) * 60 + (Number(m) || 0); };
-const toHHMM = (m) => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
-const snap = (m) => Math.round(m / STEP) * STEP;
-const sessionOf = (b) => (b.start < NOON ? "Sáng" : "Chiều");
-const overlaps = (day, s, e, ignore) =>
-  blocks.some((b) => b.day === day && b.uid !== ignore && s < b.start + b.dur && e > b.start);
-
-// ---- Giờ bận: bỏ các dòng GV_Ban không còn khớp một tiết học ----
-export function pruneBusy(tables) {
-  const valid = new Set((tables.KhungGio || []).filter((r) => r.loai_khung === "Tiết học")
-    .map((r) => r.thu + "|" + r.buoi + "|" + Number(r.tiet_so)));
-  const before = (tables.GV_Ban || []).length;
-  tables.GV_Ban = (tables.GV_Ban || []).filter((r) => valid.has(r.thu + "|" + r.buoi + "|" + Number(r.tiet_so)));
-  return before - tables.GV_Ban.length;
+function blockOptions(block) {
+  return TYPES.map((type) =>
+    `<option value="${type}"${block.type === type ? " selected" : ""}>${typeLabel(type)}</option>`
+  ).join("");
 }
 
-// ---- Khối <-> dòng KhungGio ----
-function numbering() {
-  const info = new Map();
-  for (const day of days) {
-    for (const buoi of ["Sáng", "Chiều"]) {
-      const list = blocks.filter((b) => b.day === day && sessionOf(b) === buoi).sort((a, b) => a.start - b.start);
-      const counters = { "Tiết học": 0, "Hoạt động": 0 };
-      list.forEach((b, i) => info.set(b.uid, { buoi, n: ++counters[b.type], next: list[i + 1] }));
-    }
-  }
-  return info;
+function showPopup(popup, x, y) {
+  popup.hidden = false;
+  const left = Math.max(4, Math.min(x, document.documentElement.clientWidth - popup.offsetWidth - 4));
+  const top = Math.max(4, Math.min(y, document.documentElement.clientHeight - popup.offsetHeight - 4));
+  popup.style.left = left + "px";
+  popup.style.top = top + "px";
 }
-
-function toRows() {
-  const info = numbering();
-  const rows = [];
-  days.forEach((day, d) => {
-    blocks.filter((b) => b.day === day).sort((a, b) => a.start - b.start).forEach((b) => {
-      const { buoi, n, next } = info.get(b.uid);
-      rows.push({
-        khung_gio_id: "T" + (d + 2) + "-" + (buoi === "Sáng" ? "S" : "C") + "-" + (b.type === "Tiết học" ? "T" : "HD") + n,
-        thu: day, buoi, tiet_so: n,
-        gio_bat_dau: toHHMM(b.start), thoi_luong_phut: b.dur,
-        nghi_sau_tiet_phut: next ? Math.max(0, next.start - (b.start + b.dur)) : 0,
-        loai_khung: b.type, ghi_chu: b.note,
-      });
-    });
-  });
-  return rows;
-}
-
-const commit = () => { tablesRef.KhungGio = toRows(); };
 
 export function renderTimeSlots(wrap, tables) {
-  wrapEl = wrap;
-  tablesRef = tables;
-  blocks = (tables.KhungGio || []).filter((r) => String(r.thu || "").trim()).map((r) => ({
-    uid: ++uid, day: r.thu, start: toMin(r.gio_bat_dau), dur: Number(r.thoi_luong_phut) || 45,
-    type: r.loai_khung === "Hoạt động" ? "Hoạt động" : "Tiết học", note: r.ghi_chu || "",
-  }));
-  days = [...DAYS, ...new Set(blocks.map((b) => b.day).filter((d) => !DAYS.includes(d)))];
-  selected = null;
-  message = "";
-  draw();
-}
+  let uid = 0;
+  let blocks = (tables.KhungGio || []).filter((row) => String(row.thu || "").trim())
+    .map((row) => blockFromRow(row, ++uid));
+  const days = timelineDays(blocks.map((block) => block.day));
+  let selected = new Set();
+  let anchor = null;
+  let message = "";
 
-// ---- Vẽ giao diện ----
-function readQuick() {
-  const q = (id) => wrapEl.querySelector("#" + id);
-  if (!q("tsQStart")) return;
-  quick = { day: q("tsQDay").value, start: q("tsQStart").value, count: Number(q("tsQCount").value) || 1,
-            dur: Number(q("tsQDur").value) || 45, brk: Number(q("tsQBrk").value) || 0 };
-  copyFrom = q("tsCopyFrom").value;
-}
+  const byUid = (element) => element && blocks.find((block) => block.uid === Number(element.dataset.uid));
+  const dayOptions = (value) => days.map((day) =>
+    `<option${day === value ? " selected" : ""}>${escapeHtml(day)}</option>`
+  ).join("");
 
-function draw() {
-  readQuick();
-  const info = numbering();
-  const height = (DAY_END - DAY_START) * PPM;
-  const dayOptions = (selectedValue, withAll) => (withAll ? '<option value="ALL"' + (selectedValue === "ALL" ? " selected" : "") + ">Thứ Hai – Thứ Sáu</option>" : "") +
-    days.map((d) => '<option value="' + escapeHtml(d) + '"' + (d === selectedValue ? " selected" : "") + ">" + escapeHtml(d) + "</option>").join("");
-
-  let html = '<div class="ts-tools"><span>Công cụ kéo:</span>' +
-    TYPES.map((t) => '<button type="button" class="ts-tool-btn ' + cls(t) + (tool === t ? " active" : "") + '" data-ts-tool="' + t + '">' + t + "</button>").join("") +
-    '<label>Thời lượng khi bấm (phút) <input type="number" id="tsDur" min="5" step="5" value="' + defaultDur + '"></label></div>';
-  html += '<p class="muted matrix-note">Kéo trên vùng trống để tạo khối, bấm một lần để tạo khối có thời lượng mặc định. Kéo thân khối để dời, kéo mép trên/dưới để đổi giờ. Truy bài và sinh hoạt là khối “Hoạt động” (màu cam): không đánh số tiết và không được xếp môn.</p>';
-
-  html += '<div class="ts-tools"><b>Tạo nhanh một buổi:</b>' +
-    '<select id="tsQDay">' + dayOptions(quick.day, true) + "</select>" +
-    '<label>Bắt đầu <input type="time" id="tsQStart" step="300" value="' + quick.start + '"></label>' +
-    '<label>Số tiết <input type="number" id="tsQCount" min="1" max="10" value="' + quick.count + '"></label>' +
-    '<label>Phút/tiết <input type="number" id="tsQDur" min="5" step="5" value="' + quick.dur + '"></label>' +
-    '<label>Nghỉ <input type="number" id="tsQBrk" min="0" step="5" value="' + quick.brk + '"></label>' +
-    '<button type="button" class="secondary" data-ts-action="quick">Tạo các tiết</button></div>';
-
-  html += '<div class="ts-tools"><b>Sao chép ngày:</b><select id="tsCopyFrom">' + dayOptions(copyFrom, false) + "</select>" +
-    '<button type="button" class="secondary" data-ts-action="copy">Chép sang các ngày Thứ Hai – Thứ Sáu còn lại</button></div>';
-
-  html += '<div class="grid-wrap"><div class="ts-board"><div class="ts-axis" style="height:' + height + 'px">';
-  for (let h = DAY_START / 60; h <= DAY_END / 60; h++) {
-    html += '<span style="top:' + (h * 60 - DAY_START) * PPM + 'px">' + String(h).padStart(2, "0") + ":00</span>";
-  }
-  html += "</div>";
-  for (const day of days) {
-    html += '<div class="ts-col"><div class="ts-head">' + escapeHtml(day) + "</div>" +
-      '<div class="ts-lane" data-day="' + escapeHtml(day) + '" style="height:' + height + "px;background-size:100% " + 60 * PPM + 'px">' +
-      '<div class="ts-noon" style="top:' + (NOON - DAY_START) * PPM + 'px"></div>';
-    for (const b of blocks.filter((x) => x.day === day)) {
-      const i = info.get(b.uid);
-      const title = b.type === "Tiết học" ? i.buoi + " · tiết " + i.n : (b.note || "Hoạt động");
-      html += '<div class="ts-block ' + cls(b.type) + (b.uid === selected ? " selected" : "") + '" data-uid="' + b.uid +
-        '" style="top:' + (b.start - DAY_START) * PPM + "px;height:" + b.dur * PPM + 'px">' +
-        '<div class="ts-handle top" data-handle="top"></div>' + escapeHtml(title) +
-        "<small>" + toHHMM(b.start) + "–" + toHHMM(b.start + b.dur) + "</small>" +
-        '<div class="ts-handle bottom" data-handle="bottom"></div></div>';
-    }
-    html += "</div></div>";
-  }
-  html += "</div></div>";
-
-  const sel = blocks.find((b) => b.uid === selected);
-  if (sel) {
-    html += '<div class="ts-panel"><b>Khối đang chọn (' + escapeHtml(sel.day) + ")</b>" +
-      '<select data-ts-field="type">' + TYPES.map((t) => '<option value="' + t + '"' + (t === sel.type ? " selected" : "") + ">" + t + "</option>").join("") + "</select>" +
-      '<label>Bắt đầu <input type="time" step="300" data-ts-field="start" value="' + toHHMM(sel.start) + '"></label>' +
-      '<label>Thời lượng (phút) <input type="number" min="5" step="5" data-ts-field="dur" value="' + sel.dur + '"></label>' +
-      '<label>Ghi chú <input type="text" data-ts-field="note" value="' + escapeHtml(sel.note) + '" placeholder="vd: Truy bài"></label>' +
-      '<button type="button" class="delete-row" data-ts-action="delete">Xóa khối</button></div>';
-  }
-  if (message) html += '<div class="status warn">' + escapeHtml(message) + "</div>";
-  wrapEl.innerHTML = html;
-  bind();
-}
-
-// ---- Thao tác ----
-function quickGenerate() {
-  const targets = quick.day === "ALL" ? days.slice(0, 5) : [quick.day];
-  const first = toMin(quick.start);
-  const buoi = first < NOON ? "Sáng" : "Chiều";
-  const fresh = Array.from({ length: quick.count }, (_, i) => ({ start: first + i * (quick.dur + quick.brk), dur: quick.dur }));
-  const last = fresh[fresh.length - 1];
-  if (first < DAY_START || last.start + last.dur > DAY_END) { message = "Các tiết vượt ngoài khoảng 06:00 – 18:00."; return draw(); }
-  const isOld = (b) => targets.includes(b.day) && b.type === "Tiết học" && sessionOf(b) === buoi;
-  const kept = blocks.filter((b) => !isOld(b));
-  const clash = targets.some((day) => fresh.some((f) => kept.some((b) => b.day === day && f.start < b.start + b.dur && f.start + f.dur > b.start)));
-  if (clash) { message = "Các tiết mới chồng lên một khối Hoạt động. Hãy dời hoặc xóa khối đó trước."; return draw(); }
-  if (blocks.some(isOld) && !window.confirm("Thay các tiết học " + buoi.toLowerCase() + " hiện có của các ngày đã chọn?")) return;
-  blocks = kept;
-  for (const day of targets) for (const f of fresh) blocks.push({ uid: ++uid, day, start: f.start, dur: f.dur, type: "Tiết học", note: "" });
-  message = "";
-  commit();
-  draw();
-}
-
-function copyDay() {
-  const targets = days.slice(0, 5).filter((d) => d !== copyFrom);
-  if (!window.confirm("Thay toàn bộ khung giờ của " + targets.join(", ") + " bằng khung giờ của " + copyFrom + "?")) return;
-  const source = blocks.filter((b) => b.day === copyFrom);
-  blocks = blocks.filter((b) => !targets.includes(b.day));
-  for (const day of targets) for (const b of source) blocks.push({ ...b, uid: ++uid, day });
-  selected = null;
-  message = "";
-  commit();
-  draw();
-}
-
-function bind() {
-  wrapEl.onclick = (event) => {
-    const el = event.target.closest("[data-ts-tool],[data-ts-action]");
-    if (!el) return;
-    if (el.dataset.tsTool) { tool = el.dataset.tsTool; return draw(); }
-    const action = el.dataset.tsAction;
-    if (action === "quick") readQuick(), quickGenerate();
-    else if (action === "copy") readQuick(), copyDay();
-    else if (action === "delete") {
-      blocks = blocks.filter((b) => b.uid !== selected);
-      selected = null;
-      commit();
-      draw();
-    }
-  };
-
-  wrapEl.onchange = (event) => {
-    if (event.target.id === "tsDur") { defaultDur = Math.max(STEP, snap(Number(event.target.value) || 45)); return; }
-    const field = event.target.dataset.tsField;
-    const b = blocks.find((x) => x.uid === selected);
-    if (!field || !b) return;
-    const old = { ...b };
-    if (field === "type") b.type = event.target.value;
-    if (field === "note") b.note = event.target.value;
-    if (field === "start") b.start = Math.max(DAY_START, toMin(event.target.value));
-    if (field === "dur") b.dur = Math.max(STEP, snap(Number(event.target.value) || STEP));
-    if (overlaps(b.day, b.start, b.start + b.dur, b.uid) || b.start + b.dur > DAY_END) {
-      Object.assign(b, old);
-      message = "Giá trị này làm khối chồng lên khối khác hoặc vượt quá 18:00, đã hoàn lại.";
-    } else {
-      message = "";
-      commit();
-    }
+  function commit(notice = "") {
+    tables.KhungGio = toRows(blocks, days);
+    message = notice;
     draw();
-  };
+  }
 
-  wrapEl.onpointerdown = (event) => {
-    const lane = event.target.closest(".ts-lane");
-    if (!lane || event.button !== 0) return;
-    event.preventDefault();
-    const day = lane.dataset.day;
-    const at = (ev) => Math.min(DAY_END, Math.max(DAY_START, DAY_START + snap((ev.clientY - lane.getBoundingClientRect().top) / PPM)));
-    const blockEl = event.target.closest(".ts-block");
-    const b = blockEl && blocks.find((x) => x.uid === Number(blockEl.dataset.uid));
-    const mode = !b ? "create" : event.target.dataset.handle === "top" ? "top" : event.target.dataset.handle === "bottom" ? "bottom" : "move";
-    const origin = at(event);
-    const orig = b ? { start: b.start, dur: b.dur } : null;
-    let moved = false, range = [origin, origin], ghost = null;
+  function boardHtml() {
+    const info = numbering(blocks, days);
+    return renderWeeklyTimeline(days, escapeHtml, (day) =>
+      blocks.filter((block) => block.day === day).map((block) => `
+        <div class="ts-block ${typeClass(block.type)}${block.dur < 25 ? " compact" : ""}${selected.has(block.uid) ? " selected" : ""}"
+             data-uid="${block.uid}" style="top:${timeTop(block.start)}px;height:${block.dur * PPM}px">
+          <div class="ts-handle top" data-handle="top"></div>
+          <span class="ts-block-title">${escapeHtml(blockTitle(block, info.get(block.uid)))}</span>
+          <small>${timeRange(block)}</small>
+          <div class="ts-handle bottom" data-handle="bottom"></div>
+        </div>`).join(""));
+  }
 
-    const onMove = (ev) => {
-      const m = at(ev);
-      if (m !== origin) moved = true;
-      if (mode === "create") {
-        range = [Math.min(origin, m), Math.max(origin, m)];
-        if (!ghost) { ghost = document.createElement("div"); ghost.className = "ts-ghost"; lane.appendChild(ghost); }
-        ghost.style.top = (range[0] - DAY_START) * PPM + "px";
-        ghost.style.height = Math.max(STEP, range[1] - range[0]) * PPM + "px";
+  function draw() {
+    const scroll = wrap.querySelector(".ts-scroll")?.scrollLeft ?? 0;
+    const buttons = TYPES.map((type) => `<button type="button"
+      class="ts-tool-btn ${typeClass(type)}${tool === type ? " active" : ""}"
+      aria-pressed="${tool === type}" data-ts-tool="${type}">${typeLabel(type)}</button>`).join("");
+    wrap.innerHTML = `
+      <div class="ts-tools">${buttons}
+        <label>Thời lượng <input id="tsDur" type="number" min="${STEP}" max="${DAY_END - DAY_START}"
+          step="${STEP}" value="${durations[tool]}"> phút</label>
+      </div>
+      <p class="muted matrix-note">Bấm vùng trống để thêm. Ctrl+bấm để chọn từng ô, Shift+bấm để chọn một vùng.
+        Kéo ô đã chọn để di chuyển. Bấm chuột phải để chỉnh sửa, sao chép hoặc xóa.</p>
+      ${message ? `<div class="status warn" role="status">${escapeHtml(message)}</div>` : ""}
+      ${boardHtml()}
+      <div class="ts-hover" hidden></div>
+      <div class="ts-context" hidden></div>`;
+    wrap.querySelector(".ts-scroll").scrollLeft = scroll;
+    bind();
+  }
+
+  function selectBlock(block, event) {
+    if (event.shiftKey && anchor) {
+      const firstDay = days.indexOf(anchor.day);
+      const lastDay = days.indexOf(block.day);
+      const start = Math.min(anchor.start, block.start);
+      const end = Math.max(anchor.start + anchor.dur, block.start + block.dur);
+      selected = new Set(blocks.filter((item) => {
+        const day = days.indexOf(item.day);
+        return day >= Math.min(firstDay, lastDay) && day <= Math.max(firstDay, lastDay) &&
+          item.start < end && item.start + item.dur > start;
+      }).map((item) => item.uid));
+    } else if (event.ctrlKey || event.metaKey) {
+      if (selected.has(block.uid)) selected.delete(block.uid);
+      else selected.add(block.uid);
+      anchor = block;
+    } else {
+      selected = new Set([block.uid]);
+      anchor = block;
+    }
+  }
+
+  function bind() {
+    const board = wrap.querySelector(".ts-board");
+    const hover = wrap.querySelector(".ts-hover");
+    const menu = wrap.querySelector(".ts-context");
+    const duration = wrap.querySelector("#tsDur");
+    let dragging = false;
+
+    duration.onchange = () => {
+      durations[tool] = Math.min(DAY_END - DAY_START,
+        Math.max(STEP, snap(Number(duration.value) || DEFAULT_DURATION[tool])));
+      duration.value = durations[tool];
+    };
+    wrap.querySelectorAll("[data-ts-tool]").forEach((button) => {
+      button.onclick = () => {
+        tool = button.dataset.tsTool;
+        draw();
+      };
+    });
+
+    board.onpointermove = (event) => {
+      const lane = event.target.closest(".ts-lane");
+      if (!lane || dragging || !menu.hidden) {
+        hover.hidden = true;
         return;
       }
-      let s = b.start, d = b.dur;
-      const end = orig.start + orig.dur;
-      if (mode === "move") s = Math.min(DAY_END - orig.dur, Math.max(DAY_START, orig.start + m - origin));
-      else if (mode === "bottom") d = Math.max(STEP, m - orig.start);
-      else { s = Math.min(m, end - STEP); d = end - s; }
-      if (!overlaps(day, s, s + d, b.uid)) {
-        b.start = s; b.dur = d;
-        blockEl.style.top = (s - DAY_START) * PPM + "px";
-        blockEl.style.height = d * PPM + "px";
+      hover.textContent = toHHMM(minuteAt(lane, event.clientY));
+      showPopup(hover, event.clientX + 12, event.clientY + 14);
+    };
+    board.onpointerleave = () => { hover.hidden = true; };
+
+    board.onpointerdown = (event) => {
+      const lane = event.target.closest(".ts-lane");
+      if (!lane || event.button !== 0 || dragging) return;
+      event.preventDefault();
+      hover.hidden = true;
+      if (!menu.hidden) {
+        menu.hidden = true;
+        return;
       }
+      const block = byUid(event.target.closest(".ts-block"));
+      if (block && (event.shiftKey || event.ctrlKey || event.metaKey)) {
+        selectBlock(block, event);
+        draw();
+        return;
+      }
+      if (block && !selected.has(block.uid)) selectBlock(block, event);
+      const group = block ? blocks.filter((item) => selected.has(item.uid)) : [];
+      board.querySelectorAll(".ts-block").forEach((element) =>
+        element.classList.toggle("selected", selected.has(Number(element.dataset.uid))));
+      dragging = true;
+
+      function check(candidates) {
+        if (!candidates) return "Hãy thả trong bảng khung giờ.";
+        if (candidates.some((item) => !item.day)) return "Một số hoạt động vượt ra ngoài các cột ngày.";
+        return placementError(candidates, blocks, block ? selected : new Set());
+      }
+
+      startSlotDrag(event, board, {
+        lane, block, group, days, duration: durations[tool], type: tool,
+        onPreview(candidates) {
+          drawDragPreview(board, candidates, check(candidates));
+        },
+        onCancel: draw,
+        onDrop(candidates, moved) {
+          if (block && !moved) {
+            selectBlock(block, event);
+            message = "";
+            draw();
+            return;
+          }
+          message = check(candidates);
+          if (message) {
+            draw();
+            return;
+          }
+          if (block) {
+            const movedBlocks = new Map(candidates.map((item) => [item.uid, item]));
+            blocks = blocks.map((item) => movedBlocks.get(item.uid) ?? item);
+            anchor = blocks.find((item) => item.uid === anchor?.uid);
+          } else {
+            const added = { ...candidates[0], uid: ++uid };
+            blocks.push(added);
+            selected = new Set([added.uid]);
+            anchor = added;
+          }
+          commit();
+        },
+      });
     };
 
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      message = "";
-      if (mode === "create") {
-        const dragged = range[1] - range[0] >= STEP;
-        const start = dragged ? range[0] : origin;
-        const dur = dragged ? range[1] - range[0] : defaultDur;
-        if (start + dur > DAY_END || overlaps(day, start, start + dur, 0)) {
-          message = "Không tạo được: khối sẽ chồng lên khối khác hoặc vượt quá 18:00.";
-        } else {
-          const nb = { uid: ++uid, day, start, dur, type: tool, note: "" };
-          blocks.push(nb);
-          selected = nb.uid;
-          commit();
-        }
-      } else {
-        selected = b.uid;
-        if (moved) commit();
-      }
-      draw();
+    board.oncontextmenu = (event) => {
+      const block = byUid(event.target.closest(".ts-block"));
+      if (!block || dragging) return;
+      event.preventDefault();
+      hover.hidden = true;
+      openContext(menu, block, event.clientX, event.clientY);
     };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-  };
+  }
+
+  function openContext(menu, block, x, y) {
+    const deleteIds = selected.has(block.uid) ? new Set(selected) : new Set([block.uid]);
+    const deleteCount = deleteIds.size;
+    const deleteLabel = deleteCount === 1 ? "Xóa hoạt động" : `Xóa ${deleteCount} hoạt động đã chọn`;
+
+    function show(html) {
+      menu.innerHTML = html;
+      showPopup(menu, x, y);
+      menu.querySelector("button, select, input")?.focus({ preventScroll: true });
+    }
+
+    show(`
+      <strong>${escapeHtml(block.day)} · ${timeRange(block)}</strong>
+      <button type="button" class="secondary" data-action="edit">Chỉnh sửa hoạt động</button>
+      <button type="button" class="secondary" data-action="copy">Sao chép hoạt động</button>
+      <button type="button" class="danger" data-action="delete">${deleteLabel}</button>`);
+    menu.onkeydown = (event) => {
+      if (event.key === "Escape") menu.hidden = true;
+    };
+    menu.onclick = (event) => {
+      const button = event.target.closest("[data-action]");
+      const action = button?.dataset.action;
+      if (action === "close") menu.hidden = true;
+      if (action === "delete") {
+        button.textContent = deleteCount === 1 ? "Chắc chắn xóa?" : `Chắc chắn xóa ${deleteCount} hoạt động?`;
+        button.dataset.action = "confirm-delete";
+        showPopup(menu, x, y);
+      }
+      if (action === "confirm-delete") {
+        blocks = blocks.filter((item) => !deleteIds.has(item.uid));
+        for (const id of deleteIds) selected.delete(id);
+        if (deleteIds.has(anchor?.uid)) anchor = null;
+        commit();
+      }
+      if (action === "copy") {
+        show(`
+          <strong>Sao chép hoạt động lúc ${toHHMM(block.start)}</strong>
+          <label>Từ ngày <select name="from">${dayOptions(block.day)}</select></label>
+          <label>Đến ngày <select name="to">${dayOptions(DAYS[4])}</select></label>
+          <p class="ts-context-error" role="status"></p>
+          <button type="button" data-action="confirm-copy">Sao chép</button>
+          <button type="button" class="secondary" data-action="close">Hủy</button>`);
+      }
+      if (action === "confirm-copy") {
+        const from = menu.querySelector('[name="from"]').value;
+        const to = menu.querySelector('[name="to"]').value;
+        const fromIndex = days.indexOf(from);
+        const toIndex = days.indexOf(to);
+        const feedback = menu.querySelector(".ts-context-error");
+        if (toIndex <= fromIndex) {
+          feedback.textContent = "Ngày kết thúc phải đứng sau ngày nguồn.";
+          return;
+        }
+        const source = blocks.find((item) => item.day === from && item.start === block.start);
+        if (!source) {
+          feedback.textContent = "Ngày nguồn không có hoạt động bắt đầu lúc " + toHHMM(block.start) + ".";
+          return;
+        }
+        const copies = [];
+        const skipped = [];
+        for (const day of days.slice(fromIndex + 1, toIndex + 1)) {
+          const copy = { ...source, day };
+          const error = placementError([copy], blocks);
+          if (error) {
+            skipped.push(day + " (" + error + ")");
+          } else {
+            copies.push({ ...copy, uid: ++uid });
+          }
+        }
+        const notice = skipped.length ? "Bỏ qua " + skipped.join("; ") : "";
+        if (!copies.length) {
+          feedback.textContent = notice;
+          return;
+        }
+        blocks.push(...copies);
+        selected = new Set(copies.map((copy) => copy.uid));
+        anchor = copies[0];
+        commit(notice);
+      }
+      if (action === "edit") {
+        show(`
+          <label>Loại <select name="type">${blockOptions(block)}</select></label>
+          <label>Bắt đầu <input name="start" type="time" value="${toHHMM(block.start)}"></label>
+          <label>Thời lượng <input name="duration" type="number" min="1" value="${block.dur}"> phút</label>
+          <label>Ghi chú <input name="note" type="text" value="${escapeHtml(block.note)}"></label>
+          <p class="ts-context-error" role="status"></p>
+          <button type="button" data-action="confirm-edit">Áp dụng</button>
+          <button type="button" class="secondary" data-action="close">Hủy</button>`);
+      }
+      if (action === "confirm-edit") {
+        const value = (name) => menu.querySelector(`[name="${name}"]`).value;
+        const edited = { ...block, type: value("type"), start: toMin(value("start")),
+          dur: Number(value("duration")), note: value("note") };
+        const error = Number.isInteger(edited.dur) && edited.dur > 0
+          ? placementError([edited], blocks, new Set([block.uid])) : "Thời lượng phải là số nguyên dương.";
+        if (error) {
+          menu.querySelector(".ts-context-error").textContent = error;
+          return;
+        }
+        Object.assign(block, edited);
+        commit();
+      }
+    };
+  }
+
+  draw();
 }
