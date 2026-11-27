@@ -1,86 +1,54 @@
 # Project 3 - Xếp thời khóa biểu THCS
 
-Đồ án xây dựng ứng dụng hỗ trợ nhập dữ liệu và xếp thời khóa biểu cho trường THCS. Phiên bản hiện tại là một web cục bộ cho phép nhập/kiểm tra workbook Excel, nhập và chỉnh sửa dữ liệu trên giao diện, đánh dấu giờ bận của giáo viên và chạy bộ giải CP-SAT để xếp thời khóa biểu cả học kỳ.
-
-Toàn bộ dữ liệu trong workbook mẫu (tên, ngày, số tiết) là dữ liệu giả định để thử ứng dụng, không đại diện cho một trường cụ thể hay định mức chính thức.
+Ứng dụng web cục bộ để nhập dữ liệu trường THCS, chỉnh sửa trên lưới và xếp thời khóa biểu bằng OR-Tools CP-SAT. File Excel mẫu dùng dữ liệu giả định để chạy thử đồ án.
 
 ## Chạy thử trên Windows
 
-Từ thư mục gốc của dự án, chạy một lệnh:
+Cài Python 3.10 trở lên. Từ thư mục gốc của dự án, chạy:
 
 ```powershell
 .\backend\run.bat
 ```
 
-Lần đầu chạy, script tạo môi trường Python riêng trong `backend/.venv` và cài các thư viện khai báo trong `backend/requirements.txt`. Những lần sau, script kiểm tra dependencies rồi chạy API. Cần cài Python 3.10 trở lên trước.
+Script tạo môi trường Python trong `backend/.venv`, cài thư viện từ `backend/requirements.txt` và khởi động FastAPI. Mở [trang chủ](http://localhost:8000/) sau khi máy chủ chạy. Nếu cổng 8000 đang được sử dụng, có thể đổi `--port` trong `backend/run.bat` và mở địa chỉ tương ứng.
 
-Khi server khởi động, mở:
+## Nhập và chỉnh sửa dữ liệu
 
-- `http://127.0.0.1:8000/` để nhập Excel.
-- `http://127.0.0.1:8000/admin` để nhập và sửa dữ liệu trên giao diện.
-- `http://127.0.0.1:8000/timetable` để chạy bộ giải và xem thời khóa biểu theo tuần.
-- `http://127.0.0.1:8000/docs` để xem tài liệu API dành cho phát triển.
+- [Trang chủ](http://localhost:8000/) dùng để kiểm tra và nhập Excel, xem thống kê dữ liệu đã lưu và đặt số tiết tối thiểu mỗi giáo viên phải dạy trong tuần mẫu. Xác nhận nhập Excel sẽ thay thế dữ liệu đầu vào đang lưu.
+- [Quản trị dữ liệu](http://localhost:8000/admin) hỗ trợ chỉnh sửa lớp, môn, giáo viên và các ràng buộc. Bấm **Kiểm tra và lưu** để ghi vào SQLite. **Tải lại từ database** bỏ các thay đổi chưa lưu. Nút xóa dòng hoặc bỏ môn yêu cầu bấm lần hai. Nút xóa toàn bộ nằm trong mục thu gọn ở cuối trang.
+- **Môn giáo viên có thể dạy** có cột **Thao tác** để thêm môn. Nút bỏ môn nằm cạnh môn tương ứng.
+- **Nhu cầu tiết học** là ma trận lớp × môn, với các cột theo thứ tự của bảng **Môn học**. Kéo để chọn vùng hoặc bấm tên lớp để chọn cả hàng, rồi dùng `Ctrl+C` và `Ctrl+V`. Bấm chuột phải vào tên lớp để sao chép số tiết sang các lớp còn lại cùng khối. Thao tác ghi đè sau lần xác nhận thứ hai.
+- **Khung giờ học** là lưới theo tuần. Có thể thêm, kéo, sửa, xóa và sao chép khung giờ qua các ngày. Khung loại **Tiết học** là vị trí bộ giải có thể dùng. Các hoạt động như **Truy bài** được hiển thị trên lưới.
+- **Giờ lớp không thể học** và **Giờ giáo viên không thể dạy** dùng cùng khung giờ. Chọn lớp hoặc giáo viên trong dropdown, rồi bấm một tiết, **Sáng**, **Chiều** hoặc tên ngày để chặn hay bỏ chặn theo tuần. Ô đỏ có dấu **X** là tiết bị chặn. Nút buổi chuyển đỏ khi cả buổi đã bị chặn.
+- **Cấu hình học kỳ** và **Ngày nghỉ cố định** hỗ trợ gõ ngày theo `dd/mm/yy` hoặc bấm **Mở lịch**. Mã của dòng mới được sinh khi lưu. Dòng trống hoàn toàn được bỏ qua. Nếu ngày sai, thông báo chỉ rõ bảng, dòng và cột.
 
-Nếu gặp lỗi `WinError 10013` (cổng 8000 bị chặn hoặc đang được dùng), tắt tiến trình đang giữ cổng (`netstat -ano | findstr :8000`, rồi `taskkill /PID <PID> /F`) hoặc đổi `--port` ở dòng cuối của `backend/run.bat`.
+## Cách xếp thời khóa biểu
 
-## Tiến độ
+Ở [trang xếp lịch](http://localhost:8000/timetable), bấm **Tạo thời khóa biểu**. Bộ giải tạo một tuần mẫu từ nhu cầu tiết học, chuyên môn giáo viên và các khung giờ của trường. Mỗi cặp lớp–môn có một giáo viên đủ chuyên môn. Bộ giải tránh trùng lịch, loại tiết đã chặn theo lớp hoặc giáo viên và buộc mỗi giáo viên đạt số tiết tối thiểu đã cấu hình. Khung giờ học được phép để trống khi lớp đã đủ số tiết hoặc khi cần để thỏa các ràng buộc.
 
-Đã hoàn thành:
+Ứng dụng áp tuần mẫu cho cả học kỳ và bỏ các tiết rơi vào ngày nghỉ cố định. Hiện chưa tự xếp tiết học bù hoặc giải lại lịch riêng cho tuần có ngày nghỉ.
 
-- Nhập file Excel, kiểm tra, xác nhận lưu vào SQLite; cấu hình mức tiết tối thiểu của giáo viên.
-- Trang `/admin`:
-  - Bảng Lớp, Môn, Giáo viên: mã tự sinh khi lưu (`CLS-01`, `SUB-01`, `TCH-01`...), dữ liệu cũ giữ nguyên mã. Mã lớp và mã môn được ẩn; mã giáo viên hiển thị nhưng không cho sửa.
-  - Bảng môn giáo viên có thể dạy: chọn giáo viên dạng "mã - tên", thêm môn bằng nút `+` từ bảng Môn, mỗi môn một dòng, xếp theo bảng chữ cái.
-  - Bảng nhu cầu tiết học: nhập dạng ma trận lớp x môn, có tổng số tiết/tuần của mỗi lớp.
-  - Phím Enter xuống dòng hoặc xuống ô kế tiếp; nút "Thêm dòng" vẫn dùng được.
-- Trang `/timetable`: bộ giải xếp một tuần mẫu rồi áp dụng cho cả học kỳ, xem theo tuần, hiển thị tải tiết của giáo viên.
+Sau khi tạo lịch, chọn **Tuần**, **Xem theo** và tên lớp hoặc giáo viên. Bảng đặt các ngày ở cột và các tiết theo buổi ở hàng. Khi xem theo lớp, mỗi ô có môn và giáo viên. Khi xem theo giáo viên, mỗi ô có môn và lớp. Ô trống là tiết chưa được xếp cho đối tượng đang xem. Dấu **—** chỉ khung giờ ngoài lịch học hoặc ngày nghỉ.
 
-Chưa làm:
+Bấm **Tải Excel tuần này** để lưu bảng của tuần và lớp hoặc giáo viên đang chọn thành file `.xlsx`. Có thể mở mục **Tất cả tiết học trong tuần** để xem danh sách của toàn trường.
 
-- **Khung giờ** có bảng theo ngày. Bấm vùng trống để thêm tiết học (45 phút) hoặc truy bài (15 phút), Ctrl+bấm để chọn từng ô, Shift+bấm để chọn một vùng. Kéo ô đã chọn để di chuyển và xem trước giờ mới. Bấm chuột phải để chỉnh sửa, sao chép tới các ngày trong một khoảng hoặc xác nhận xóa.
-- **Giờ giáo viên không thể dạy** trong trang quản trị hiển thị cùng khung giờ với bảng Khung giờ học. Chọn giáo viên, rồi bấm vào một tiết hoặc tên ngày để đổi trạng thái bận hằng tuần. Tiết bận màu đỏ có dấu X, tiết có thể dạy màu xanh.
-- Các bảng Phân công tham khảo, Học kỳ, Ngày nghỉ ở `/admin` vẫn là lưới nhập thường (Phân công vẫn phải gõ tay mã lớp, môn, giáo viên).
-- Ẩn mã ở toàn bộ các bảng còn lại; chặn sửa mã giáo viên ở phía backend (hiện mới chặn ở giao diện).
-- Ràng buộc đúng 19 tiết cho mỗi giáo viên (hiện chỉ cảnh báo khi dưới mức tối thiểu), các mục tiêu tối ưu (giảm tiết trống, tránh lặp môn trong ngày...), xem theo lớp hoặc giáo viên, khóa tiết, xuất CSV/in.
-- Kiểm thử tự động (các thay đổi gần đây mới được kiểm tra thủ công trên trình duyệt).
+Bấm **Lưu thời khóa biểu** để lưu lời giải hiện tại vào SQLite và cập nhật số tiết dạy trong tuần mẫu trên trang chủ. Hệ thống giữ một lời giải, nên lần lưu tiếp theo sẽ thay thế lời giải trước. Bấm **Tải lại lời giải đã có** để mở lịch đã lưu. Trình duyệt ghi nhớ bảng đang mở khi tải lại trang quản trị trong cùng tab.
 
-## Cấu trúc hiện tại
+## Excel và lưu trữ
 
-- `backend/app/main.py`: khởi tạo ứng dụng, các địa chỉ trang, khởi tạo database.
-- `backend/app/routes/excel.py`: API xem trước và xác nhận nhập Excel.
-- `backend/app/routes/data.py`: API sửa dữ liệu trên lưới, cài đặt, thống kê; sinh mã tự động cho Lớp, Môn, Giáo viên.
-- `backend/app/routes/timetable.py`: API chạy bộ giải và nhân kết quả ra cả học kỳ.
-- `backend/app/solver.py`: bộ giải CP-SAT cho một tuần mẫu. Đầu vào là `NhuCau`, `GV_Mon`, `KhungGio` (chỉ loại `Tiết học`) và `GV_Ban`. Mỗi cặp lớp-môn được chọn đúng một giáo viên có chuyên môn; không trùng tiết của lớp hoặc giáo viên; tránh giờ bận.
-- `backend/app/calendar_expand.py`: nhân tuần mẫu ra các tuần của học kỳ, bỏ các tiết rơi vào ngày nghỉ (không xếp bù).
-- `backend/app/db_io.py`, `backend/app/helpers.py`: đọc/ghi các bảng với database và các hàm xử lý tên thứ, buổi tiếng Việt.
-- `backend/app/excel_import.py`: đọc workbook và chuyển dữ liệu sang `input_validation.py` để kiểm tra. Tên bảng và thứ tự cột nằm trong `input_schema.py`.
-- `backend/app/models.py`, `backend/app/database.py`: cấu trúc bảng SQLAlchemy và kết nối SQLite.
-- `backend/app/static/`: giao diện. `index.html` và `app.js` (nhập Excel), `admin.html` và `admin.js` (lưới nhập/chỉnh sửa), `busy.html` và `busy.js` (giờ bận), `timetable.html` và `timetable.js` (xếp lịch), `app.css` (kiểu dáng chung).
-  Trang quản trị dùng `admin.js` để tải/lưu dữ liệu và chọn cách hiển thị bảng. Các màn chỉnh sửa nằm trong `static/admin/` với `table-grid.js` (lưới thường), `teacher-subjects.js` (chuyên môn giáo viên) và `demand-matrix.js` (nhu cầu tiết học).
-- `backend/data/timetable.db`: SQLite được tạo tự động khi backend khởi động; Git bỏ qua file database này.
-- `backend/requirements.txt`: thư viện Python cần cài.
-- `Bảng nhu cầu lịch học - học kỳ.xlsx`: workbook input mẫu hiện tại, có cấu hình học kỳ và ngày nghỉ.
+Workbook có tiêu đề cột ở hàng 4 và dữ liệu từ hàng 5. Tên bảng và cột được khai báo trong `backend/app/input_schema.py`. Sheet `Lop_Ban` là tùy chọn để tương thích với file Excel cũ. `PhanCong` là sheet tham khảo của mẫu cũ, được ẩn khỏi giao diện quản trị và được bỏ qua khi trống. Kết quả xếp lịch được tạo ở trang xếp lịch.
 
-## Input Excel
+SQLite lưu tại `backend/data/timetable.db`. Ứng dụng tự tạo bảng còn thiếu khi khởi động. Mỗi lượt lưu từ trang quản trị hoặc xác nhận nhập Excel ghi dữ liệu đầu vào trong một giao dịch. Cấu hình số tiết tối thiểu được giữ khi thay dữ liệu đầu vào.
 
-Backend cần các trang `Lop`, `Mon`, `GiaoVien`, `GV_Mon`, `NhuCau`, `PhanCong`, `KhungGio`, `GV_Ban`, `HocKy` và `NgayNghi`. Tiêu đề cột nằm ở hàng 4, dữ liệu bắt đầu từ hàng 5. `Doc huong dan` và `KiemTraInput` là trang hướng dẫn/đối chiếu, không phải bảng nghiệp vụ để nhập.
+## Cấu trúc mã nguồn
 
-`PhanCong` là dữ liệu mẫu tham khảo được lưu riêng để so sánh, không phải kết quả xếp lịch và không phải đầu vào của bộ giải; chênh lệch với `NhuCau` chỉ tạo cảnh báo. Đầu vào của bộ giải gồm nhu cầu lớp-môn (`NhuCau`), chuyên môn giáo viên (`GV_Mon`), khung giờ (`KhungGio`) và giờ giáo viên không thể dạy (`GV_Ban`).
+| Tệp hoặc thư mục | Vai trò |
+| --- | --- |
+| `backend/app/main.py` | Khởi tạo ứng dụng, route và SQLite |
+| `backend/app/routes/` | API nhập Excel, quản trị, thống kê và xếp lịch |
+| `backend/app/input_schema.py`, `input_validation.py` | Cấu trúc và quy tắc kiểm tra dữ liệu |
+| `backend/app/models.py`, `db_io.py` | Mô hình SQLAlchemy và đọc ghi SQLite |
+| `backend/app/solver.py`, `calendar_expand.py` | Giải tuần mẫu và mở rộng lịch theo học kỳ |
+| `backend/app/static/` | Giao diện HTML, CSS và JavaScript |
 
-`HocKy` có đúng một dòng gồm mã/tên học kỳ, ngày bắt đầu và số tuần (1-52); ngày kết thúc tính tự động theo số tuần. `NgayNghi` có thể có nhiều dòng, mỗi dòng là một ngày nghỉ cụ thể trong năm mô phỏng. Có thể lưu ngày ngoài học kỳ; chỉ những ngày nằm trong khoảng học kỳ mới được loại khi nhân lịch. Workbook mẫu chỉ là giả định, hãy thay ngày và số tuần theo kịch bản đồ án của bạn.
-
-Mã dạng chữ như `TCH-01`, `CLS-6A` và `SUB-MATH` được dùng làm ID; các bảng liên kết luôn dùng ID, không dùng tên hiển thị. Giờ truy bài và sinh hoạt lớp có loại khung `Hoạt động`, không được tính vào tải giảng dạy. Mức tiết tối thiểu chỉnh ở giao diện và lưu trong database, mặc định là 19; hiện chỉ dùng để cảnh báo.
-
-Khi xác nhận Excel mới hoặc lưu từ `/admin`, các bảng dữ liệu thời khóa biểu, kể cả giờ bận (`GV_Ban`), được thay thế trong một transaction; cấu hình mức tiết được giữ nguyên.
-
-## Nhập và chỉnh sửa trên `/admin`
-
-- Chọn bảng, sửa từng ô, thêm hoặc xóa dòng, rồi bấm "Kiểm tra và lưu". Toàn bộ các bảng được kiểm tra cùng lúc trước khi ghi vào database.
-- **Lớp, Môn, Giáo viên:** chỉ nhập tên (và khối với lớp). Mã được sinh khi lưu. Lớp, môn hoặc giáo viên mới phải được lưu một lần thì mới xuất hiện ở các bảng phụ thuộc.
-- **Môn giáo viên có thể dạy:** mỗi giáo viên một dòng; bấm `+` để thêm môn, bấm `×` để bỏ môn.
-- **Nhu cầu tiết học:** ma trận lớp x môn; để trống hoặc 0 nếu lớp không học môn đó. Ô phải là số nguyên từ 0 đến 40.
-- Nút "Xóa toàn bộ dữ liệu" cần bấm hai lần để xác nhận.
-
-## Lưu ý
-
-Ứng dụng hỗ trợ người xếp thời khóa biểu ra quyết định; nhân sự nhà trường vẫn chịu trách nhiệm kiểm tra kết quả. Ứng dụng chạy cục bộ, chưa có tài khoản đăng nhập.
+Xem [tài liệu API](http://localhost:8000/docs) khi phát triển. Xem `CLAUDE.md` để nắm chi tiết luồng dữ liệu và hành vi cần giữ khi sửa mã.

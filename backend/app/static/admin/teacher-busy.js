@@ -20,9 +20,21 @@ export function renderTeacherBusy(wrap, tables, preferredTeacher = "", onChange 
 
   function dayHeading(day) {
     const hasLessons = lessons.some((row) => row.thu === day);
+    const sessions = ["Sáng", "Chiều"].filter((session) =>
+      lessons.some((row) => row.thu === day && row.buoi === session));
+    const sessionButtons = sessions.map((session) =>
+      `<button type="button" class="secondary" data-busy-day="${escapeHtml(day)}"
+        data-busy-session="${session}" aria-label="${escapeHtml(day)} · ${session}"
+        aria-pressed="false">${session}</button>`).join("");
     return `<button type="button" class="busy-day" data-busy-day="${escapeHtml(day)}"
       aria-pressed="false"${hasLessons ? "" : " disabled"}><span>${escapeHtml(day)}</span>
-      <small>${hasLessons ? "Bận cả ngày" : "Không có tiết dạy"}</small></button>`;
+  <small>${hasLessons ? "Bận cả ngày" : "Không có tiết dạy"}</small></button>
+      <div class="busy-sessions">${sessionButtons}</div>`;
+  }
+
+  function headingSlots(button) {
+    const { busyDay, busySession } = button.dataset;
+    return lessons.filter((row) => row.thu === busyDay && (!busySession || row.buoi === busySession));
   }
 
   function daySlots(day) {
@@ -72,10 +84,12 @@ export function renderTeacherBusy(wrap, tables, preferredTeacher = "", onChange 
       cell.setAttribute("aria-pressed", busy.has(cell.dataset.busyKey));
     }
     for (const button of board.querySelectorAll("[data-busy-day]:enabled")) {
-      const allBusy = lessons.filter((row) => row.thu === button.dataset.busyDay)
+      const allBusy = headingSlots(button)
         .every((row) => busy.has(busySlotKey(row)));
       button.setAttribute("aria-pressed", allBusy);
-      button.querySelector("small").textContent = allBusy ? "Bỏ bận cả ngày" : "Bận cả ngày";
+      if (!button.dataset.busySession) {
+        button.querySelector("small").textContent = allBusy ? "Bỏ bận cả ngày" : "Bận cả ngày";
+      }
     }
   }
 
@@ -84,7 +98,7 @@ export function renderTeacherBusy(wrap, tables, preferredTeacher = "", onChange 
     const heading = event.target.closest("[data-busy-day]:enabled");
     if (!cell && !heading) return;
     const affected = cell ? lessons.filter((row) => busySlotKey(row) === cell.dataset.busyKey)
-      : lessons.filter((row) => row.thu === heading.dataset.busyDay);
+      : headingSlots(heading);
     const keys = new Set(affected.map(busySlotKey));
     const existing = busyKeys();
     const remove = [...keys].every((key) => existing.has(key));

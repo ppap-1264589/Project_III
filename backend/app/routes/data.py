@@ -49,6 +49,7 @@ def data_summary() -> dict:
             return session.scalar(select(func.count()).select_from(model)) or 0
 
         semester = session.scalars(select(models.SemesterConfig)).first()
+        saved = session.get(models.SavedTimetable, 1)
         return {
             "counts": {
                 "classes": count(models.SchoolClass), "subjects": count(models.Subject),
@@ -63,18 +64,20 @@ def data_summary() -> dict:
                 "end_date": (semester.start_date + timedelta(days=semester.duration_weeks * 7 - 1)).isoformat(),
             },
             "holiday_count": count(models.SchoolHoliday),
+            "has_saved_timetable": saved is not None,
         }
 
 
 @router.get("/teachers")
 def list_teachers() -> list[dict]:
-    """Danh sách giáo viên + số tiết trong bảng PhanCong tham khảo."""
+    """Số tiết trong tuần mẫu của thời khóa biểu đã lưu."""
     with SessionLocal() as session:
-        loads: dict[str, int] = {}
-        for a in session.scalars(select(models.TeachingAssignment)):
-            loads[a.teacher_id] = loads.get(a.teacher_id, 0) + a.periods_per_week
+        saved = session.get(models.SavedTimetable, 1)
+        if saved is not None:
+            loads = sorted(saved.result["teacher_loads"], key=lambda item: item["teacher_id"])
+            return [{"id": t["teacher_id"], "name": t["teacher"], "assigned_periods": t["periods"]} for t in loads]
         teachers = session.scalars(select(models.Teacher).order_by(models.Teacher.id))
-        return [{"id": t.id, "name": t.display_name, "assigned_periods": loads.get(t.id, 0)} for t in teachers]
+        return [{"id": t.id, "name": t.display_name, "assigned_periods": 0} for t in teachers]
 
 
 # ---------- Sửa dữ liệu trên lưới (/admin) ----------
@@ -142,5 +145,8 @@ def clear_all_data() -> dict:
     """Xóa sạch mọi bảng dữ liệu đầu vào (Excel hoặc nhập tay). Cài đặt mức tiết tối thiểu được giữ nguyên."""
     with SessionLocal.begin() as session:
         replace_all(session, {name: [] for name in SHEETS})
+        saved = session.get(models.SavedTimetable, 1)
+        if saved is not None:
+            session.delete(saved)
     clear_previews()
     return {"cleared": True, "message": "Đã xóa toàn bộ dữ liệu khỏi hệ thống."}

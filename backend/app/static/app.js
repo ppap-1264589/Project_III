@@ -68,7 +68,14 @@ async function refreshData() {
       teachers.map((teacher) => "<tr><td>" + escapeHtml(teacher.id) + " · " + escapeHtml(teacher.name) +
         "</td><td>" + teacher.assigned_periods + "</td></tr>").join("") + "</tbody></table>"
     : '<p class="muted">Chưa có giáo viên trong cơ sở dữ liệu.</p>';
+  byId("teacherLoadSource").textContent = summary.has_saved_timetable
+    ? "Theo thời khóa biểu đã lưu."
+    : "Chưa có thời khóa biểu đã lưu.";
 }
+
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) refreshData();
+});
 
 function renderIssue(issue) {
   const location = [

@@ -50,7 +50,7 @@ def parse_and_validate(content: bytes, min_periods: int = DEFAULT_MIN_TEACHING_P
         }
 
     try:
-        missing = sorted(set(SHEETS) - set(workbook.sheetnames))
+        missing = sorted(set(SHEETS) - set(workbook.sheetnames) - {"Lop_Ban"})
         if missing:
             issues.append(make_issue("MISSING_SHEETS", f"Thiếu trang tính: {', '.join(missing)}.", "Workbook"))
         parsed: dict[str, list[dict[str, Any]]] = {}

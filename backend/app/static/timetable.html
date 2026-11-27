@@ -10,7 +10,6 @@
 <body>
   <header>
     <h1>Xếp thời khóa biểu cả học kỳ</h1>
-    <p>Bộ giải CP-SAT xếp một tuần mẫu rồi áp dụng cho mọi tuần của học kỳ</p>
   </header>
   <main>
     <section>
@@ -22,19 +21,37 @@
         <div>
     <a class="button-link" href="/">Trở về trang chủ</a> <a class="button-link" href="/admin">Quản trị dữ liệu</a>
           <button id="solve">Tạo thời khóa biểu</button>
+          <button id="loadSaved" class="secondary" disabled>Tải lại lời giải đã có</button>
+          <button id="saveSchedule" disabled>Lưu thời khóa biểu</button>
         </div>
       </div>
-      <div id="result" class="status">Chưa chạy bộ giải.</div>
+      <div id="result" class="status" role="status">Chưa chạy bộ giải.</div>
     </section>
     <section id="detail" hidden>
-      <h2>Tải tiết của giáo viên (mỗi tuần)</h2>
-      <div id="loads" class="grid-wrap"></div>
-      <h2 class="section-heading">Thời khóa biểu theo tuần</h2>
+      <div class="admin-toolbar">
+        <h2>Thời khóa biểu theo tuần</h2>
+        <button id="export" class="secondary">Tải Excel tuần này</button>
+      </div>
       <div class="admin-controls">
         <label for="weekSelect">Tuần</label>
         <select id="weekSelect"></select>
+        <label for="viewSelect">Xem theo</label>
+        <select id="viewSelect">
+          <option value="class">Lớp</option>
+          <option value="teacher">Giáo viên</option>
+        </select>
+        <label id="entityLabel" for="entitySelect">Lớp</label>
+        <select id="entitySelect"></select>
       </div>
-      <div id="lessons" class="grid-wrap"></div>
+      <p id="weekSummary" class="muted" aria-live="polite"></p>
+      <p id="exportStatus" role="status" hidden></p>
+      <div id="weeklyGrid" class="grid-wrap" role="region" aria-label="Bảng thời khóa biểu" tabindex="0"></div>
+      <h2 class="section-heading">Tải tiết của giáo viên trong tuần mẫu</h2>
+      <div id="loads" class="grid-wrap"></div>
+      <details class="section-heading timetable-lessons">
+        <summary>Tất cả tiết học trong tuần</summary>
+        <div id="lessons" class="grid-wrap"></div>
+      </details>
     </section>
   </main>
 </body>

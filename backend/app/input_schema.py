@@ -28,6 +28,7 @@ SHEETS: dict[str, tuple[str, ...]] = {
         "ghi_chu",
     ),
     "GV_Ban": ("giao_vien_id", "thu", "buoi", "tiet_so", "ghi_chu"),
+    "Lop_Ban": ("lop_id", "thu", "buoi", "tiet_so"),
     "HocKy": ("hoc_ky_id", "ten_hoc_ky", "ngay_bat_dau", "so_tuan"),
     "NgayNghi": ("ngay_nghi_id", "ngay", "ten_ngay_nghi"),
 }

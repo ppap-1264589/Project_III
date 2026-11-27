@@ -24,6 +24,7 @@ def solve_timetable(
     slots,            # [{"id", "weekday", "session", "period"}] chỉ "Tiết học" (KhungGio)
     busy,             # {(teacher_id, weekday, session, period)}             (GV_Ban)
     teacher_names, class_names, subject_names,   # {id: tên} để hiện thông báo cho dễ đọc
+    class_busy=(),
     min_periods=0,  # số tiết tối thiểu mỗi giáo viên trong tuần mẫu
     time_limit=30.0,
     workers=8,
@@ -73,10 +74,17 @@ def solve_timetable(
             message = f"Môn {subject_names.get(subject_id, subject_id)} chưa có giáo viên nào được khai báo trong GV_Mon."
             if message not in problems:
                 problems.append(message)
+    class_busy = set(class_busy)
+    blocked_slots = {
+        class_id: {s["id"] for s in slots
+                   if (class_id, s["weekday"], s["session"], s["period"]) in class_busy}
+        for class_id in class_load
+    }
     for class_id, load in class_load.items():
-        if load > len(slots):
+        available = len(slots) - len(blocked_slots[class_id])
+        if load > available:
             problems.append(f"Lớp {class_names.get(class_id, class_id)} cần {load} tiết/tuần "
-                            f"nhưng chỉ có {len(slots)} khung học.")
+                            f"nhưng chỉ còn {available} khung có thể học.")
     if problems:
         return _fail("infeasible", "Không thể xếp lịch vì dữ liệu chưa đủ.", problems)
 
@@ -95,6 +103,8 @@ def solve_timetable(
             teacher_periods[teacher_id].append(periods * pick)
             here = []
             for slot in free_slots[teacher_id]:
+                if slot["id"] in blocked_slots[class_id]:
+                    continue
                 x = model.NewBoolVar(f"x_{class_id}_{subject_id}_{teacher_id}_{slot['id']}")  # 1 nếu dạy ở khung này
                 here.append(x)
                 lessons.append((x, class_id, subject_id, teacher_id, slot))
@@ -132,14 +142,15 @@ def solve_timetable(
 
     schedule = [
         {"class": class_names.get(c, c), "subject": subject_names.get(s, s), "teacher": teacher_names.get(t, t),
-         "weekday": slot["weekday"], "session": slot["session"], "period": slot["period"], "_t": t}
+         "weekday": slot["weekday"], "session": slot["session"], "period": slot["period"],
+         "class_id": c, "teacher_id": t, "slot_id": slot["id"]}
         for x, c, s, t, slot in sorted(lessons, key=lambda item: (slot_order(item[4]), item[1]))
         if solver.Value(x)
     ]
 
     loads = defaultdict(int)
     for row in schedule:
-        loads[row.pop("_t")] += 1
+        loads[row["teacher_id"]] += 1
     # giáo viên không được chọn dạy lớp nào vẫn hiện với 0 tiết
     teacher_loads = [{"teacher_id": t, "teacher": teacher_names.get(t, t), "periods": loads[t]} for t in all_teachers]
 

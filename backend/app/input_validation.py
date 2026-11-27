@@ -76,6 +76,7 @@ def _validate_required_fields_and_keys(parsed, issues):
         "GV_Mon": ("giao_vien_id", "mon_id"),
         "NhuCau": ("lop_id", "mon_id"),
         "GV_Ban": ("giao_vien_id", "thu", "buoi", "tiet_so"),
+        "Lop_Ban": ("lop_id", "thu", "buoi", "tiet_so"),
         "HocKy": ("hoc_ky_id",), "NgayNghi": ("ngay_nghi_id",),
     }
     for sheet_name, rows in parsed.items():
@@ -221,6 +222,15 @@ def validate_input(parsed, issues: list[Issue], min_periods: int) -> dict[str, A
     _validate_required_fields_and_keys(parsed, issues)
     class_ids, subject_ids, teacher_ids, demand_totals, teacher_load = _validate_demands_and_assignments(parsed, issues)
     _validate_time_slots(parsed, teacher_ids, issues)
+    lesson_keys = {
+        (cell_text(row["thu"]), cell_text(row["buoi"]), _integer(row["tiet_so"]))
+        for row in parsed["KhungGio"] if cell_text(row["loai_khung"]) == "Tiết học"
+    }
+    for index, row in enumerate(parsed["Lop_Ban"], start=HEADER_ROW + 1):
+        if row["lop_id"] not in class_ids:
+            issues.append(make_issue("UNKNOWN_CLASS", "Không tìm thấy lớp.", "Lop_Ban", index, "lop_id"))
+        if (row["thu"], row["buoi"], _integer(row["tiet_so"])) not in lesson_keys:
+            issues.append(make_issue("UNKNOWN_TIME_SLOT", "Khung bị chặn phải khớp với một tiết học.", "Lop_Ban", index, "tiet_so"))
 
     warnings: list[Issue] = [item for item in issues if item.severity == "warning"]
     for teacher_id, load in sorted(teacher_load.items()):
