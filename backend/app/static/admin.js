@@ -1,10 +1,11 @@
 import { byId, escapeHtml, readResponse } from "./admin/helpers.js";
-import { columns, issueTitles, labels, sheetLabels } from "./admin/labels.js";
+import { columns, issueTitles, labels, sheetLabels } from "./admin/labels.js?v=class-busy";
 import { captureVisibleInputs, confirmDelete, editableColumns, focusCell, renderTableGrid } from "./admin/table-grid.js?v=delete-layout";
 import { pruneTeacherSubjects, renderTeacherSubjects } from "./admin/teacher-subjects.js?v=delete-layout";
 import { pruneDemand, renderDemandMatrix } from "./admin/demand-matrix.js?v=copy-demand";
 import { pruneBusy, renderTimeSlots } from "./admin/time-slots.js";
-import { renderTeacherBusy } from "./admin/teacher-busy.js";
+import { renderTeacherBusy } from "./admin/teacher-busy.js?v=day-sessions";
+import { pruneClassBusy, renderClassBusy } from "./admin/class-busy.js?v=class-activities";
 
 const gridWrap = byId("gridWrap");
 
@@ -12,6 +13,7 @@ let dataSet = {};
 let tableColumns = {};
 let activeTable = null;
 let busyTeacher = "";
+let busyClass = "";
 
 async function loadData(successMessage = "Đã tải lại dữ liệu từ database") {
   byId("status").className = "status";
@@ -22,7 +24,7 @@ async function loadData(successMessage = "Đã tải lại dữ liệu từ data
     if (!response.ok) throw new Error(result.detail || "Không tải được dữ liệu.");
     dataSet = result.tables;
     tableColumns = result.columns;
-    const previous = activeTable;
+    const previous = activeTable ?? sessionStorage.getItem("admin.activeTable");
     const select = byId("tableSelect");
     const visibleTables = Object.keys(tableColumns).filter((name) => name !== "PhanCong");
     select.innerHTML = visibleTables.map((name) =>
@@ -43,7 +45,7 @@ async function loadData(successMessage = "Đã tải lại dữ liệu từ data
 function renderGrid() {
   activeTable = byId("tableSelect").value;
   gridWrap.onclick = gridWrap.onchange = gridWrap.oninput = gridWrap.onkeydown = gridWrap.onpointerdown = null;
-  byId("addRow").hidden = ["GV_Mon", "NhuCau", "KhungGio", "GV_Ban"].includes(activeTable);
+  byId("addRow").hidden = ["GV_Mon", "NhuCau", "KhungGio", "GV_Ban", "Lop_Ban"].includes(activeTable);
   if (activeTable === "GV_Mon") {
     renderTeacherSubjects(gridWrap, dataSet);
   } else if (activeTable === "NhuCau") {
@@ -52,12 +54,15 @@ function renderGrid() {
     renderTimeSlots(gridWrap, dataSet);
   } else if (activeTable === "GV_Ban") {
     renderTeacherBusy(gridWrap, dataSet, busyTeacher, (teacherId) => { busyTeacher = teacherId; });
+  } else if (activeTable === "Lop_Ban") {
+    renderClassBusy(gridWrap, dataSet, busyClass, (classId) => { busyClass = classId; });
   } else {
     renderTableGrid(gridWrap, activeTable, tableColumns, dataSet[activeTable] || []);
   }
 }
 
 byId("tableSelect").addEventListener("change", () => {
+  sessionStorage.setItem("admin.activeTable", byId("tableSelect").value);
   captureVisibleInputs(gridWrap, dataSet[activeTable]);
   renderGrid();
 });
@@ -125,6 +130,7 @@ byId("saveData").addEventListener("click", async () => {
   pruneTeacherSubjects(dataSet);
   pruneDemand(dataSet);
   const removedBusy = pruneBusy(dataSet);
+  pruneClassBusy(dataSet);
   if (document.querySelector(".demand-cell.invalid")) {
     byId("status").className = "status bad";
     byId("status").textContent = "Có ô nhu cầu không hợp lệ (cần số nguyên từ 0 đến 40). Hãy sửa các ô viền đỏ.";

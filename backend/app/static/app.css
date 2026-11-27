@@ -32,11 +32,24 @@ button.secondary{background:#e7eef5;color:#214563}button:disabled{opacity:.5;cur
 .demand-matrix .demand-class:hover{background:#e6f1ff}
 .demand-copy-menu{position:fixed;inset:auto;margin:0;padding:5px;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 4px 15px #182c4833;max-width:calc(100vw - 12px)}
 .demand-feedback:empty{display:none}
+.busy-sessions{display:flex;justify-content:center;gap:4px}
+.ts-tools select[data-blocked-class]{padding:7px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;font:inherit}
+.busy-sessions button.secondary{margin:3px 0;padding:4px 8px}
+.busy-sessions button.secondary[aria-pressed="true"]{background:#b42318;color:#fff}
 .semester-calendar input[data-calendar]{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none}
 .admin-controls{justify-content:flex-start;margin:16px 0}
 .admin-controls select{min-width:220px;padding:10px;border:1px solid #cbd7e4;border-radius:7px;background:#fff}
 .button-link{display:inline-block;padding:10px 14px;border-radius:7px;background:#e7eef5;color:#214563;text-decoration:none;font-weight:600}
 .grid-wrap{max-width:100%;overflow:auto;border:1px solid #e1e8f0;border-radius:8px}
+.weekly-result{min-width:660px;margin:0;table-layout:fixed}
+.weekly-result th,.weekly-result td{padding:9px 10px;border:1px solid #e1e8f0;white-space:pre-line;overflow-wrap:anywhere;vertical-align:middle}
+.weekly-result thead th{background:#edf3f8;color:#173b5f}
+.weekly-result tbody th{background:#f7f9fc}
+.weekly-result td.scheduled{background:#e8f1fa;color:#173b5f}
+.weekly-result td.unavailable{background:#f5f7fa;color:#617187;text-align:center}
+.timetable-lessons > summary{cursor:pointer;width:fit-content;padding:8px 12px;border-radius:7px;background:#e7eef5;color:#214563;font-weight:600}
+.timetable-lessons > summary:hover{background:#d8e6f3}
+.timetable-lessons[open] > summary{margin-bottom:10px}
 .edit-grid{min-width:780px;margin:0}
 .edit-grid th{position:sticky;top:0;z-index:1;background:#edf3f8}
 .edit-grid td{padding:4px}

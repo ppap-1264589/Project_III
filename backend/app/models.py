@@ -1,6 +1,6 @@
 import datetime as dt
 
-from sqlalchemy import Date, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import JSON, Date, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -77,6 +77,15 @@ class TimeSlot(Base):
     __table_args__ = (UniqueConstraint("thu", "buoi", "loai_khung", "tiet_so", name="uq_slot_day_session_kind_period"),)
 
 
+class ClassUnavailableSlot(Base):
+    __tablename__ = "class_unavailable_slots"
+
+    class_id: Mapped[str] = mapped_column(ForeignKey("classes.lop_id", ondelete="CASCADE"), primary_key=True)
+    weekday: Mapped[str] = mapped_column(String(20), primary_key=True)
+    session: Mapped[str] = mapped_column(String(20), primary_key=True)
+    period_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
 class TeacherUnavailableSlot(Base):
     __tablename__ = "teacher_unavailable_slots"
     teacher_id: Mapped[str] = mapped_column(ForeignKey("teachers.giao_vien_id", ondelete="CASCADE"), primary_key=True)
@@ -89,3 +98,9 @@ class AppSetting(Base):
     __tablename__ = "app_settings"
     key: Mapped[str] = mapped_column(String(80), primary_key=True)
     value: Mapped[str] = mapped_column(String(300), nullable=False)
+
+
+class SavedTimetable(Base):
+    __tablename__ = "saved_timetable"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    result: Mapped[dict] = mapped_column(JSON, nullable=False)

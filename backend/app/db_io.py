@@ -28,6 +28,8 @@ TABLES = {
     "GV_Ban": (models.TeacherUnavailableSlot, {
         "giao_vien_id": "teacher_id", "thu": "weekday", "buoi": "session",
         "tiet_so": "period_number", "ghi_chu": "note"}),
+    "Lop_Ban": (models.ClassUnavailableSlot, {
+        "lop_id": "class_id", "thu": "weekday", "buoi": "session", "tiet_so": "period_number"}),
     "HocKy": (models.SemesterConfig, {
         "hoc_ky_id": "id", "ten_hoc_ky": "name", "ngay_bat_dau": "start_date", "so_tuan": "duration_weeks"}),
     "NgayNghi": (models.SchoolHoliday, {"ngay_nghi_id": "id", "ngay": "date", "ten_ngay_nghi": "name"}),

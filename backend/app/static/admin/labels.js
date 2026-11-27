@@ -7,6 +7,7 @@ export const labels = {
   PhanCong: "Phân công tham khảo (dữ liệu mẫu)",
   KhungGio: "Khung giờ học",
   GV_Ban: "Giờ giáo viên không thể dạy",
+  Lop_Ban: "Giờ lớp không thể học",
   HocKy: "Cấu hình học kỳ",
   NgayNghi: "Ngày nghỉ cố định",
 };
@@ -45,4 +46,5 @@ export const sheetLabels = {
   NhuCau:"Nhu cầu tiết học", PhanCong:"Phân công tham khảo",
   KhungGio:"Khung giờ học", GV_Ban:"Giờ giáo viên không thể dạy",
   HocKy:"Cấu hình học kỳ", NgayNghi:"Ngày nghỉ cố định",
+  Lop_Ban:"Giờ lớp không thể học",
 };
