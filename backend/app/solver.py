@@ -366,9 +366,12 @@ def solve_timetable(
     schedule = _read_schedule(solver, lessons, teacher_names, class_names, subject_names)
     teacher_loads = _count_teacher_loads(schedule, data, teacher_names)
     total_gaps = sum(row["gaps"] for row in teacher_loads)
+    message = f"Đã xếp {len(schedule)} tiết cho một tuần mẫu, tổng {total_gaps} tiết trống của giáo viên."
+    if status != cp_model.OPTIMAL:
+        message += f" Hết {time_limit:g} giây trước khi chứng minh được số tiết trống nhỏ nhất, nên lịch có thể còn giảm được tiết trống."
     return {
         "status": "optimal" if status == cp_model.OPTIMAL else "feasible",
-        "message": f"Đã xếp {len(schedule)} tiết cho một tuần mẫu, tổng {total_gaps} tiết trống của giáo viên.",
+        "message": message,
         "schedule": schedule,
         "teacher_loads": teacher_loads,
         "problems": [],
