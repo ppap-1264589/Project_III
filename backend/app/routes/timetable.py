@@ -21,7 +21,7 @@ class TeacherLoad(BaseModel):
     teacher_id: str
     teacher: str
     periods: int = Field(ge=0)
-    gaps: int = Field(default=0, ge=0)
+    gaps: int | None = Field(default=None, ge=0)  # lời giải lưu trước khi có cột này không có số liệu
 
 
 class SavedResult(BaseModel):

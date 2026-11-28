@@ -116,7 +116,7 @@ function renderSchedule(data, message) {
     `tổng ${data.lessons.length} tiết (${esc(data.status)}).` + listHtml(data.warnings);
 
   $("loads").innerHTML = '<table><thead><tr><th>Giáo viên</th><th>Số tiết/tuần</th><th>Tiết trống</th></tr></thead><tbody>' +
-    data.teacher_loads.map((t) => `<tr><td>${esc(t.teacher)} (${esc(t.teacher_id)})</td><td>${t.periods}</td><td>${t.gaps ?? 0}</td></tr>`).join("") +
+    data.teacher_loads.map((t) => `<tr><td>${esc(t.teacher)} (${esc(t.teacher_id)})</td><td>${t.periods}</td><td>${t.gaps ?? "—"}</td></tr>`).join("") +
     "</tbody></table>";
 
   schedule = data;
