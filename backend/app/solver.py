@@ -1,127 +1,275 @@
 """Bộ giải CP-SAT: xếp thời khóa biểu cho MỘT TUẦN MẪU.
 
-Ý tưởng mô hình:
-  - Với mỗi (lớp, môn): chọn đúng 1 giáo viên dạy được môn đó.
-  - Giáo viên được chọn phải dạy đủ số tiết/tuần của (lớp, môn), vào các khung giáo viên rảnh.
-  - Cùng một khung giờ: 1 lớp chỉ học 1 tiết, 1 giáo viên chỉ dạy 1 tiết.
-Hàm này không đụng database, nên dễ test. Việc đọc DB nằm ở routes/timetable.py.
+File này không đọc database, nên có thể gọi và kiểm thử độc lập.
+Việc đọc dữ liệu nằm ở routes/timetable.py.
+
+Ký hiệu
+-------
+  c: lớp    m: môn    g: giáo viên    k: khung giờ "Tiết học"
+  nhu_cau[c, m]: số tiết/tuần lớp c phải học môn m (bảng NhuCau)
+
+Biến quyết định (đều là 0/1)
+----------------------------
+  assign[c, m, g]   = 1 nếu giáo viên g được giao dạy môn m cho lớp c
+  teach[c, m, g, k] = 1 nếu lớp c học môn m với giáo viên g ở khung k
+
+  Biến teach chỉ được tạo khi g dạy được m, g rảnh ở k và lớp c không bị chặn ở k.
+  Nhờ vậy giờ bận của giáo viên và lớp được thỏa mãn mà không cần thêm ràng buộc.
+
+Ràng buộc
+---------
+  (1) Mỗi (lớp, môn) có đúng một giáo viên:   Σ_g assign[c, m, g] = 1
+  (2) Giáo viên được giao dạy đủ số tiết, giáo viên không được giao dạy 0 tiết:
+                                               Σ_k teach[c, m, g, k] = nhu_cau[c, m] · assign[c, m, g]
+  (3) Một lớp học tối đa một tiết mỗi khung:   Σ_{m, g} teach[c, m, g, k] ≤ 1
+  (4) Một giáo viên dạy tối đa một tiết mỗi khung: Σ_{c, m} teach[c, m, g, k] ≤ 1
+  (5) Mỗi giáo viên dạy ít nhất min_periods tiết:  Σ_{c, m} nhu_cau[c, m] · assign[c, m, g] ≥ min_periods
+
+Không có hàm mục tiêu: bộ giải chỉ cần tìm một lịch thỏa mọi ràng buộc.
+Khung giờ được phép để trống.
 """
 from collections import defaultdict
+from dataclasses import dataclass
 
 from ortools.sat.python import cp_model
 
 from .helpers import session_order, weekday_index
 
 
+# ---------------------------------------------------------------------------
+# Cấu trúc dữ liệu
+# ---------------------------------------------------------------------------
+
+@dataclass
+class PreparedData:
+    """Dữ liệu đầu vào đã được sắp xếp lại để tra cứu nhanh khi dựng mô hình."""
+    demands: dict               # {(class_id, subject_id): số tiết/tuần}, chỉ giữ số tiết > 0
+    slots: list                 # [{"id", "weekday", "session", "period"}]
+    teachers_of_subject: dict   # {subject_id: [teacher_id, ...]}
+    free_slots_of_teacher: dict  # {teacher_id: [slot, ...]}, khung giáo viên không bận
+    blocked_slots_of_class: dict  # {class_id: {slot_id, ...}}, khung lớp không học được
+    all_teachers: list          # mọi giáo viên, kể cả người chưa khai báo môn
+
+
+@dataclass
+class Lesson:
+    """Một biến teach[c, m, g, k] cùng thông tin để đọc kết quả."""
+    var: cp_model.IntVar
+    class_id: str
+    subject_id: str
+    teacher_id: str
+    slot: dict
+
+
 def _fail(status, message, problems=()):
     return {"status": status, "message": message, "problems": list(problems), "warnings": []}
 
 
+def _time_key(teacher_or_class_id, slot):
+    """Khóa (đối tượng, thứ, buổi, tiết) dùng trong GV_Ban và Lop_Ban."""
+    return (teacher_or_class_id, slot["weekday"], slot["session"], slot["period"])
+
+
+# ---------------------------------------------------------------------------
+# Bước 1: chuẩn bị dữ liệu
+# ---------------------------------------------------------------------------
+
+def _prepare_data(demands, qualified, slots, busy, class_busy, teacher_names):
+    teachers_of_subject = defaultdict(list)
+    for teacher_id, subject_id in sorted(qualified):
+        teachers_of_subject[subject_id].append(teacher_id)
+
+    qualified_teachers = {teacher_id for teacher_id, _ in qualified}
+    free_slots_of_teacher = {
+        teacher_id: [slot for slot in slots if _time_key(teacher_id, slot) not in busy]
+        for teacher_id in qualified_teachers
+    }
+
+    class_busy = set(class_busy)
+    classes_with_demand = {class_id for class_id, _ in demands}
+    blocked_slots_of_class = {
+        class_id: {slot["id"] for slot in slots if _time_key(class_id, slot) in class_busy}
+        for class_id in classes_with_demand
+    }
+
+    return PreparedData(
+        demands=demands,
+        slots=slots,
+        teachers_of_subject=teachers_of_subject,
+        free_slots_of_teacher=free_slots_of_teacher,
+        blocked_slots_of_class=blocked_slots_of_class,
+        all_teachers=sorted(teacher_names.keys() | qualified_teachers),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Bước 2: kiểm tra nhanh để báo lỗi dễ hiểu trước khi giải
+# ---------------------------------------------------------------------------
+
+def _find_data_problems(data, min_periods, teacher_names, class_names, subject_names):
+    """Trả về danh sách lỗi dữ liệu chắc chắn làm bài toán vô nghiệm."""
+    problems = []
+
+    # Tổng số tiết phải đủ để mọi giáo viên đạt mức tối thiểu
+    total_periods = sum(data.demands.values())
+    minimum_total = len(data.all_teachers) * min_periods
+    if total_periods < minimum_total:
+        problems.append(
+            f"Tổng nhu cầu là {total_periods} tiết/tuần. "
+            f"Để {len(data.all_teachers)} giáo viên đều dạy ít nhất {min_periods} tiết/tuần, "
+            f"cần ít nhất {minimum_total} tiết/tuần."
+        )
+
+    # Mỗi giáo viên phải có đủ khung rảnh để đạt mức tối thiểu
+    if min_periods > 0:
+        for teacher_id in data.all_teachers:
+            name = teacher_names.get(teacher_id, teacher_id)
+            if teacher_id not in data.free_slots_of_teacher:
+                problems.append(f"Giáo viên {name} chưa được khai báo môn có thể dạy, "
+                                f"nên không thể đạt {min_periods} tiết/tuần.")
+                continue
+            available = len(data.free_slots_of_teacher[teacher_id])
+            if available < min_periods:
+                problems.append(f"Giáo viên {name} chỉ có {available} khung giờ dạy còn trống, "
+                                f"nên không thể đạt {min_periods} tiết/tuần.")
+
+    # Môn nào có nhu cầu cũng phải có ít nhất một giáo viên
+    for _, subject_id in data.demands:
+        if not data.teachers_of_subject[subject_id]:
+            message = f"Môn {subject_names.get(subject_id, subject_id)} chưa có giáo viên nào được khai báo trong GV_Mon."
+            if message not in problems:
+                problems.append(message)
+
+    # Mỗi lớp phải có đủ khung không bị chặn để học hết số tiết
+    class_load = defaultdict(int)
+    for (class_id, _), periods in data.demands.items():
+        class_load[class_id] += periods
+    for class_id, load in class_load.items():
+        available = len(data.slots) - len(data.blocked_slots_of_class[class_id])
+        if load > available:
+            problems.append(f"Lớp {class_names.get(class_id, class_id)} cần {load} tiết/tuần "
+                            f"nhưng chỉ còn {available} khung có thể học.")
+
+    return problems
+
+
+# ---------------------------------------------------------------------------
+# Bước 3: dựng mô hình CP-SAT
+# ---------------------------------------------------------------------------
+
+def _build_model(data, min_periods):
+    """Tạo biến và ràng buộc (1)-(5) ở đầu file. Trả về (model, danh sách Lesson)."""
+    model = cp_model.CpModel()
+    lessons = []
+    lessons_of_class_slot = defaultdict(list)    # (lớp, khung)       -> các biến teach
+    lessons_of_teacher_slot = defaultdict(list)  # (giáo viên, khung) -> các biến teach
+    periods_of_teacher = defaultdict(list)       # giáo viên -> các biểu thức nhu_cau · assign
+
+    for (class_id, subject_id), periods in sorted(data.demands.items()):
+        blocked = data.blocked_slots_of_class[class_id]
+        assign_vars = []
+
+        for teacher_id in data.teachers_of_subject[subject_id]:
+            assign = model.NewBoolVar(f"assign_{class_id}_{subject_id}_{teacher_id}")
+            assign_vars.append(assign)
+            periods_of_teacher[teacher_id].append(periods * assign)
+
+            teach_vars = []
+            for slot in data.free_slots_of_teacher[teacher_id]:
+                if slot["id"] in blocked:
+                    continue
+                teach = model.NewBoolVar(f"teach_{class_id}_{subject_id}_{teacher_id}_{slot['id']}")
+                teach_vars.append(teach)
+                lessons.append(Lesson(teach, class_id, subject_id, teacher_id, slot))
+                lessons_of_class_slot[(class_id, slot["id"])].append(teach)
+                lessons_of_teacher_slot[(teacher_id, slot["id"])].append(teach)
+
+            model.Add(sum(teach_vars) == periods * assign)  # (2)
+
+        model.AddExactlyOne(assign_vars)  # (1)
+
+    for same_class_slot in lessons_of_class_slot.values():
+        model.AddAtMostOne(same_class_slot)  # (3)
+    for same_teacher_slot in lessons_of_teacher_slot.values():
+        model.AddAtMostOne(same_teacher_slot)  # (4)
+
+    if min_periods > 0:
+        for teacher_id in data.all_teachers:
+            model.Add(sum(periods_of_teacher[teacher_id]) >= min_periods)  # (5)
+
+    return model, lessons
+
+
+# ---------------------------------------------------------------------------
+# Bước 4: đọc kết quả
+# ---------------------------------------------------------------------------
+
+def _slot_sort_key(slot):
+    """Sắp theo thứ, buổi (sáng trước chiều), rồi số tiết."""
+    day = weekday_index(slot["weekday"])
+    return (9 if day is None else day, session_order(slot["session"]), slot["period"])
+
+
+def _read_schedule(solver, lessons, teacher_names, class_names, subject_names):
+    chosen = [lesson for lesson in lessons if solver.Value(lesson.var)]
+    chosen.sort(key=lambda lesson: (_slot_sort_key(lesson.slot), lesson.class_id))
+    return [
+        {
+            "class": class_names.get(lesson.class_id, lesson.class_id),
+            "subject": subject_names.get(lesson.subject_id, lesson.subject_id),
+            "teacher": teacher_names.get(lesson.teacher_id, lesson.teacher_id),
+            "weekday": lesson.slot["weekday"],
+            "session": lesson.slot["session"],
+            "period": lesson.slot["period"],
+            "class_id": lesson.class_id,
+            "teacher_id": lesson.teacher_id,
+            "slot_id": lesson.slot["id"],
+        }
+        for lesson in chosen
+    ]
+
+
+def _count_teacher_loads(schedule, all_teachers, teacher_names):
+    """Số tiết của từng giáo viên. Giáo viên không được giao lớp nào vẫn hiện với 0 tiết."""
+    loads = defaultdict(int)
+    for row in schedule:
+        loads[row["teacher_id"]] += 1
+    return [
+        {"teacher_id": teacher_id, "teacher": teacher_names.get(teacher_id, teacher_id), "periods": loads[teacher_id]}
+        for teacher_id in all_teachers
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Hàm chính
+# ---------------------------------------------------------------------------
+
 def solve_timetable(
     *,
-    demands,          # {(class_id, subject_id): số tiết/tuần}              (NhuCau)
-    qualified,        # {(teacher_id, subject_id)}                           (GV_Mon)
-    slots,            # [{"id", "weekday", "session", "period"}] chỉ "Tiết học" (KhungGio)
-    busy,             # {(teacher_id, weekday, session, period)}             (GV_Ban)
-    teacher_names, class_names, subject_names,   # {id: tên} để hiện thông báo cho dễ đọc
-    class_busy=(),
-    min_periods=0,  # số tiết tối thiểu mỗi giáo viên trong tuần mẫu
+    demands,          # {(class_id, subject_id): số tiết/tuần}               (NhuCau)
+    qualified,        # {(teacher_id, subject_id)}                            (GV_Mon)
+    slots,            # [{"id", "weekday", "session", "period"}], chỉ "Tiết học" (KhungGio)
+    busy,             # {(teacher_id, weekday, session, period)}              (GV_Ban)
+    teacher_names, class_names, subject_names,   # {id: tên}, dùng trong thông báo và kết quả
+    class_busy=(),    # {(class_id, weekday, session, period)}                (Lop_Ban)
+    min_periods=0,    # số tiết tối thiểu mỗi giáo viên trong tuần mẫu
     time_limit=30.0,
     workers=8,
 ):
-    demands = {k: v for k, v in demands.items() if v > 0}
+    demands = {key: periods for key, periods in demands.items() if periods > 0}
     if not demands:
         return _fail("error", "Chưa có nhu cầu tiết học (NhuCau) để xếp lịch.")
     if not slots:
         return _fail("error", "Chưa có khung giờ loại 'Tiết học' (KhungGio).")
 
-    # Bước 1: mỗi môn có những giáo viên nào dạy được?
-    teachers_of = defaultdict(list)
-    for teacher_id, subject_id in sorted(qualified):
-        teachers_of[subject_id].append(teacher_id)
+    data = _prepare_data(demands, qualified, slots, busy, class_busy, teacher_names)
 
-    # Bước 2: mỗi giáo viên rảnh ở những khung nào? (khung không nằm trong 'busy')
-    free_slots = {
-        teacher_id: [s for s in slots if (teacher_id, s["weekday"], s["session"], s["period"]) not in busy]
-        for teacher_id in {t for t, _ in qualified}
-    }
-
-    # Bước 3: kiểm tra nhanh để báo lỗi dễ hiểu trước khi giải
-    all_teachers = sorted(teacher_names.keys() | free_slots.keys())
-    problems = []
-    total_periods = sum(demands.values())
-    minimum_total = len(all_teachers) * min_periods
-    if total_periods < minimum_total:
-        problems.append(
-            f"Tổng nhu cầu là {total_periods} tiết/tuần. "
-            f"Để {len(all_teachers)} giáo viên đều dạy ít nhất {min_periods} tiết/tuần, "
-            f"cần ít nhất {minimum_total} tiết/tuần."
-        )
-    if min_periods > 0:
-        for teacher_id in all_teachers:
-            available = len(free_slots.get(teacher_id, ()))
-            if available < min_periods:
-                name = teacher_names.get(teacher_id, teacher_id)
-                reason = (
-                    f"chỉ có {available} khung giờ dạy còn trống"
-                    if teacher_id in free_slots else "chưa được khai báo môn có thể dạy"
-                )
-                problems.append(f"Giáo viên {name} {reason}, nên không thể đạt {min_periods} tiết/tuần.")
-    class_load = defaultdict(int)
-    for (class_id, subject_id), periods in demands.items():
-        class_load[class_id] += periods
-        if not teachers_of[subject_id]:
-            message = f"Môn {subject_names.get(subject_id, subject_id)} chưa có giáo viên nào được khai báo trong GV_Mon."
-            if message not in problems:
-                problems.append(message)
-    class_busy = set(class_busy)
-    blocked_slots = {
-        class_id: {s["id"] for s in slots
-                   if (class_id, s["weekday"], s["session"], s["period"]) in class_busy}
-        for class_id in class_load
-    }
-    for class_id, load in class_load.items():
-        available = len(slots) - len(blocked_slots[class_id])
-        if load > available:
-            problems.append(f"Lớp {class_names.get(class_id, class_id)} cần {load} tiết/tuần "
-                            f"nhưng chỉ còn {available} khung có thể học.")
+    problems = _find_data_problems(data, min_periods, teacher_names, class_names, subject_names)
     if problems:
         return _fail("infeasible", "Không thể xếp lịch vì dữ liệu chưa đủ.", problems)
 
-    # Bước 4: dựng mô hình CP-SAT
-    model = cp_model.CpModel()
-    lessons = []                          # (biến, lớp, môn, giáo viên, khung)
-    in_class_slot = defaultdict(list)     # (lớp, khung)       -> các biến cùng ô
-    in_teacher_slot = defaultdict(list)   # (giáo viên, khung) -> các biến cùng ô
+    model, lessons = _build_model(data, min_periods)
 
-    teacher_periods = defaultdict(list)
-    for (class_id, subject_id), periods in sorted(demands.items()):
-        options = []
-        for teacher_id in teachers_of[subject_id]:
-            pick = model.NewBoolVar(f"pick_{class_id}_{subject_id}_{teacher_id}")  # 1 nếu chọn giáo viên này
-            options.append(pick)
-            teacher_periods[teacher_id].append(periods * pick)
-            here = []
-            for slot in free_slots[teacher_id]:
-                if slot["id"] in blocked_slots[class_id]:
-                    continue
-                x = model.NewBoolVar(f"x_{class_id}_{subject_id}_{teacher_id}_{slot['id']}")  # 1 nếu dạy ở khung này
-                here.append(x)
-                lessons.append((x, class_id, subject_id, teacher_id, slot))
-                in_class_slot[(class_id, slot["id"])].append(x)
-                in_teacher_slot[(teacher_id, slot["id"])].append(x)
-            # chọn giáo viên này -> đủ `periods` tiết; không chọn -> 0 tiết
-            model.Add(sum(here) == periods * pick)
-        model.AddExactlyOne(options)  # mỗi (lớp, môn) đúng 1 giáo viên
-
-    for group in [*in_class_slot.values(), *in_teacher_slot.values()]:
-        model.AddAtMostOne(group)     # không trùng tiết
-
-    if min_periods > 0:
-        for teacher_id in all_teachers:
-            model.Add(sum(teacher_periods[teacher_id]) >= min_periods)
-
-    # Bước 5: giải
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = float(time_limit)
     solver.parameters.num_workers = int(workers)
@@ -135,27 +283,12 @@ def solve_timetable(
         return _fail("timeout", f"Chưa tìm được lịch trong {time_limit:g} giây (chưa kết luận là vô nghiệm). "
                                 "Thử tăng thời gian hoặc giảm tải giáo viên.")
 
-    # Bước 6: lấy kết quả
-    def slot_order(slot):
-        day = weekday_index(slot["weekday"])
-        return (9 if day is None else day, session_order(slot["session"]), slot["period"])
-
-    schedule = [
-        {"class": class_names.get(c, c), "subject": subject_names.get(s, s), "teacher": teacher_names.get(t, t),
-         "weekday": slot["weekday"], "session": slot["session"], "period": slot["period"],
-         "class_id": c, "teacher_id": t, "slot_id": slot["id"]}
-        for x, c, s, t, slot in sorted(lessons, key=lambda item: (slot_order(item[4]), item[1]))
-        if solver.Value(x)
-    ]
-
-    loads = defaultdict(int)
-    for row in schedule:
-        loads[row["teacher_id"]] += 1
-    # giáo viên không được chọn dạy lớp nào vẫn hiện với 0 tiết
-    teacher_loads = [{"teacher_id": t, "teacher": teacher_names.get(t, t), "periods": loads[t]} for t in all_teachers]
-
+    schedule = _read_schedule(solver, lessons, teacher_names, class_names, subject_names)
     return {
         "status": "optimal" if status == cp_model.OPTIMAL else "feasible",
         "message": f"Đã xếp {len(schedule)} tiết cho một tuần mẫu.",
-        "schedule": schedule, "teacher_loads": teacher_loads, "problems": [], "warnings": [],
+        "schedule": schedule,
+        "teacher_loads": _count_teacher_loads(schedule, data.all_teachers, teacher_names),
+        "problems": [],
+        "warnings": [],
     }
