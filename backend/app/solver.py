@@ -47,7 +47,7 @@ from dataclasses import dataclass
 
 from ortools.sat.python import cp_model
 
-from .helpers import session_order, weekday_index
+from .helpers import fold, session_order, weekday_index
 
 
 # ---------------------------------------------------------------------------
@@ -171,11 +171,17 @@ def _find_data_problems(data, min_periods, teacher_names, class_names, subject_n
 # Bước 3: dựng mô hình CP-SAT
 # ---------------------------------------------------------------------------
 
+def _session_key(slot):
+    """Khóa (thứ, buổi) không phụ thuộc cách viết: 'Thứ Hai' và 'Thứ 2' là cùng một ngày."""
+    day = weekday_index(slot["weekday"])
+    return (fold(slot["weekday"]) if day is None else day, fold(slot["session"]))
+
+
 def _slots_by_session(slots):
     """Nhóm khung giờ theo (thứ, buổi), mỗi nhóm sắp theo số tiết."""
     groups = defaultdict(list)
     for slot in slots:
-        groups[(slot["weekday"], slot["session"])].append(slot)
+        groups[_session_key(slot)].append(slot)
     return [sorted(group, key=lambda slot: slot["period"]) for group in groups.values()]
 
 
@@ -283,13 +289,13 @@ def _count_teacher_gaps(schedule, data):
     """Đếm tiết trống của từng giáo viên trong lịch đã xếp, theo định nghĩa ở đầu file."""
     taught_periods = defaultdict(set)  # (giáo viên, thứ, buổi) -> các số tiết có dạy
     for row in schedule:
-        taught_periods[(row["teacher_id"], row["weekday"], row["session"])].add(row["period"])
+        taught_periods[(row["teacher_id"], _session_key(row))].add(row["period"])
 
     gaps = defaultdict(int)
     for session in _slots_by_session(data.slots):
-        weekday, session_name = session[0]["weekday"], session[0]["session"]
+        key = _session_key(session[0])
         for teacher_id, free_slots in data.free_slots_of_teacher.items():
-            taught = taught_periods.get((teacher_id, weekday, session_name))
+            taught = taught_periods.get((teacher_id, key))
             if not taught:
                 continue
             free_ids = {slot["id"] for slot in free_slots}
