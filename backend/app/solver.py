@@ -25,15 +25,29 @@ Ràng buộc
   (4) Một giáo viên dạy tối đa một tiết mỗi khung: Σ_{c, m} teach[c, m, g, k] ≤ 1
   (5) Mỗi giáo viên dạy ít nhất min_periods tiết:  Σ_{c, m} nhu_cau[c, m] · assign[c, m, g] ≥ min_periods
 
-Không có hàm mục tiêu: bộ giải chỉ cần tìm một lịch thỏa mọi ràng buộc.
-Khung giờ được phép để trống.
+Hàm mục tiêu: giảm tổng số tiết trống của giáo viên
+---------------------------------------------------
+  Trong một buổi (cùng thứ, cùng buổi), khung k là "tiết trống" của giáo viên g nếu
+  g rảnh ở k, không dạy ở k, nhưng có dạy ở một khung j trước k và một khung l sau k.
+  Ví dụ: dạy tiết 1 và tiết 4, rảnh tiết 2, 3 -> 2 tiết trống.
+  Khung giáo viên bận (GV_Ban) không tính là tiết trống.
+
+  Đặt busy[g, k] = Σ_{c, m} teach[c, m, g, k] (bằng 0 hoặc 1 nhờ ràng buộc (4)).
+  Với mỗi khung k và mỗi cặp j < k < l trong cùng buổi, thêm biến 0/1 gap[g, k] với:
+  (6)  gap[g, k] ≥ busy[g, j] + busy[g, l] − busy[g, k] − 1
+  Vế phải bằng 1 chỉ khi g dạy ở j và l nhưng không dạy ở k, ngược lại ≤ 0.
+
+  Minimize Σ gap[g, k]
+
+  Khi tổng nhỏ nhất, gap[g, k] = 1 đúng khi k là tiết trống.
+  Hàm mục tiêu không ảnh hưởng ràng buộc (1)-(5). Khung giờ vẫn được phép để trống.
 """
 from collections import defaultdict
 from dataclasses import dataclass
 
 from ortools.sat.python import cp_model
 
-from .helpers import session_order, weekday_index
+from .helpers import fold, session_order, weekday_index
 
 
 # ---------------------------------------------------------------------------
@@ -157,8 +171,22 @@ def _find_data_problems(data, min_periods, teacher_names, class_names, subject_n
 # Bước 3: dựng mô hình CP-SAT
 # ---------------------------------------------------------------------------
 
+def _session_key(slot):
+    """Khóa (thứ, buổi) không phụ thuộc cách viết: 'Thứ Hai' và 'Thứ 2' là cùng một ngày."""
+    day = weekday_index(slot["weekday"])
+    return (fold(slot["weekday"]) if day is None else day, fold(slot["session"]))
+
+
+def _slots_by_session(slots):
+    """Nhóm khung giờ theo (thứ, buổi), mỗi nhóm sắp theo số tiết."""
+    groups = defaultdict(list)
+    for slot in slots:
+        groups[_session_key(slot)].append(slot)
+    return [sorted(group, key=lambda slot: slot["period"]) for group in groups.values()]
+
+
 def _build_model(data, min_periods):
-    """Tạo biến và ràng buộc (1)-(5) ở đầu file. Trả về (model, danh sách Lesson)."""
+    """Tạo biến, ràng buộc (1)-(6) và hàm mục tiêu ở đầu file. Trả về (model, danh sách Lesson)."""
     model = cp_model.CpModel()
     lessons = []
     lessons_of_class_slot = defaultdict(list)    # (lớp, khung)       -> các biến teach
@@ -197,7 +225,35 @@ def _build_model(data, min_periods):
         for teacher_id in data.all_teachers:
             model.Add(sum(periods_of_teacher[teacher_id]) >= min_periods)  # (5)
 
+    _minimize_teacher_gaps(model, data, lessons_of_teacher_slot)
     return model, lessons
+
+
+def _minimize_teacher_gaps(model, data, lessons_of_teacher_slot):
+    """Thêm biến gap, ràng buộc (6) và hàm mục tiêu Minimize Σ gap."""
+    gap_vars = []
+    for teacher_id in sorted(data.free_slots_of_teacher):
+        free_ids = {slot["id"] for slot in data.free_slots_of_teacher[teacher_id]}
+
+        for session in _slots_by_session(data.slots):
+            # busy[i] = Σ teach của giáo viên ở khung thứ i trong buổi (0 nếu không thể dạy ở đó)
+            teach_lists = [lessons_of_teacher_slot.get((teacher_id, slot["id"]), []) for slot in session]
+            busy = [sum(teach_vars) for teach_vars in teach_lists]
+
+            for k, slot in enumerate(session):
+                if slot["id"] not in free_ids:
+                    continue
+                # chỉ xét các cặp (j, l) mà giáo viên có thể dạy ở cả hai khung
+                pairs = [(j, l) for j in range(k) for l in range(k + 1, len(session))
+                         if teach_lists[j] and teach_lists[l]]
+                if not pairs:
+                    continue
+                gap = model.NewBoolVar(f"gap_{teacher_id}_{slot['id']}")
+                for j, l in pairs:
+                    model.Add(gap >= busy[j] + busy[l] - busy[k] - 1)  # (6)
+                gap_vars.append(gap)
+
+    model.Minimize(sum(gap_vars))
 
 
 # ---------------------------------------------------------------------------
@@ -229,14 +285,38 @@ def _read_schedule(solver, lessons, teacher_names, class_names, subject_names):
     ]
 
 
-def _count_teacher_loads(schedule, all_teachers, teacher_names):
-    """Số tiết của từng giáo viên. Giáo viên không được giao lớp nào vẫn hiện với 0 tiết."""
+def _count_teacher_gaps(schedule, data):
+    """Đếm tiết trống của từng giáo viên trong lịch đã xếp, theo định nghĩa ở đầu file."""
+    taught_periods = defaultdict(set)  # (giáo viên, thứ, buổi) -> các số tiết có dạy
+    for row in schedule:
+        taught_periods[(row["teacher_id"], _session_key(row))].add(row["period"])
+
+    gaps = defaultdict(int)
+    for session in _slots_by_session(data.slots):
+        key = _session_key(session[0])
+        for teacher_id, free_slots in data.free_slots_of_teacher.items():
+            taught = taught_periods.get((teacher_id, key))
+            if not taught:
+                continue
+            free_ids = {slot["id"] for slot in free_slots}
+            gaps[teacher_id] += sum(
+                1 for slot in session
+                if min(taught) < slot["period"] < max(taught)
+                and slot["period"] not in taught and slot["id"] in free_ids
+            )
+    return gaps
+
+
+def _count_teacher_loads(schedule, data, teacher_names):
+    """Số tiết và số tiết trống của từng giáo viên. Giáo viên không được giao lớp nào vẫn hiện với 0 tiết."""
     loads = defaultdict(int)
     for row in schedule:
         loads[row["teacher_id"]] += 1
+    gaps = _count_teacher_gaps(schedule, data)
     return [
-        {"teacher_id": teacher_id, "teacher": teacher_names.get(teacher_id, teacher_id), "periods": loads[teacher_id]}
-        for teacher_id in all_teachers
+        {"teacher_id": teacher_id, "teacher": teacher_names.get(teacher_id, teacher_id),
+         "periods": loads[teacher_id], "gaps": gaps[teacher_id]}
+        for teacher_id in data.all_teachers
     ]
 
 
@@ -284,11 +364,16 @@ def solve_timetable(
                                 "Thử tăng thời gian hoặc giảm tải giáo viên.")
 
     schedule = _read_schedule(solver, lessons, teacher_names, class_names, subject_names)
+    teacher_loads = _count_teacher_loads(schedule, data, teacher_names)
+    total_gaps = sum(row["gaps"] for row in teacher_loads)
+    message = f"Đã xếp {len(schedule)} tiết cho một tuần mẫu, tổng {total_gaps} tiết trống của giáo viên."
+    if status != cp_model.OPTIMAL:
+        message += f" Hết {time_limit:g} giây trước khi chứng minh được số tiết trống nhỏ nhất, nên lịch có thể còn giảm được tiết trống."
     return {
         "status": "optimal" if status == cp_model.OPTIMAL else "feasible",
-        "message": f"Đã xếp {len(schedule)} tiết cho một tuần mẫu.",
+        "message": message,
         "schedule": schedule,
-        "teacher_loads": _count_teacher_loads(schedule, data.all_teachers, teacher_names),
+        "teacher_loads": teacher_loads,
         "problems": [],
         "warnings": [],
     }

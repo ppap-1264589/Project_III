@@ -33,9 +33,9 @@ Run `backend\run.bat` from the repository root. The stack uses Python 3.10+, Fas
 
 ## Solver semantics
 
-`routes/timetable.py` reads the database and calls `solver.py`. CP-SAT solves one sample week using `NhuCau`, `GV_Mon`, teaching slots from `KhungGio`, `GV_Ban`, and `Lop_Ban`. Each class–subject pair is assigned to one qualified teacher. Classes and teachers cannot be double-booked. The solver excludes blocked slots and enforces the configured weekly minimum for every teacher. Unused teaching slots are allowed. The minimum applies to the sample week.
+`routes/timetable.py` reads the database and calls `solver.py`. CP-SAT solves one sample week using `NhuCau`, `GV_Mon`, teaching slots from `KhungGio`, `GV_Ban`, and `Lop_Ban`. Each class–subject pair is assigned to one qualified teacher. Classes and teachers cannot be double-booked. The solver excludes blocked slots and enforces the configured weekly minimum for every teacher. Unused teaching slots are allowed. The minimum applies to the sample week. The objective minimizes teacher gaps: a free, non-blocked teaching slot between two taught slots in the same weekday and session. A `feasible` status means the time limit ended before the minimum was proven, and the message says so. Teacher loads include a `gaps` count per teacher.
 
-`calendar_expand.py` repeats the sample week across the semester and omits lessons on fixed holidays. Holiday weeks may therefore have fewer lessons. Make-up scheduling, date-specific availability, richer optimization objectives, and an automated regression suite remain future work.
+`calendar_expand.py` repeats the sample week across the semester and omits lessons on fixed holidays. Holiday weeks may therefore have fewer lessons. Make-up scheduling, date-specific availability, further optimization objectives, and an automated regression suite remain future work.
 
 ## Weekly results and export
 

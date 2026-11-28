@@ -115,8 +115,8 @@ function renderSchedule(data, message) {
   $("result").innerHTML = `${esc(message)} Học kỳ “${esc(data.semester.name)}”: ${data.semester.weeks} tuần, ` +
     `tổng ${data.lessons.length} tiết (${esc(data.status)}).` + listHtml(data.warnings);
 
-  $("loads").innerHTML = '<table><thead><tr><th>Giáo viên</th><th>Số tiết/tuần</th></tr></thead><tbody>' +
-    data.teacher_loads.map((t) => `<tr><td>${esc(t.teacher)} (${esc(t.teacher_id)})</td><td>${t.periods}</td></tr>`).join("") +
+  $("loads").innerHTML = '<table><thead><tr><th>Giáo viên</th><th>Số tiết/tuần</th><th>Tiết trống</th></tr></thead><tbody>' +
+    data.teacher_loads.map((t) => `<tr><td>${esc(t.teacher)} (${esc(t.teacher_id)})</td><td>${t.periods}</td><td>${t.gaps ?? "—"}</td></tr>`).join("") +
     "</tbody></table>";
 
   schedule = data;
