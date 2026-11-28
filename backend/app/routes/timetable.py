@@ -21,6 +21,7 @@ class TeacherLoad(BaseModel):
     teacher_id: str
     teacher: str
     periods: int = Field(ge=0)
+    gaps: int = Field(default=0, ge=0)
 
 
 class SavedResult(BaseModel):

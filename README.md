@@ -24,7 +24,7 @@ Script tạo môi trường Python trong `backend/.venv`, cài thư viện từ 
 
 ## Cách xếp thời khóa biểu
 
-Ở [trang xếp lịch](http://localhost:8000/timetable), bấm **Tạo thời khóa biểu**. Bộ giải tạo một tuần mẫu từ nhu cầu tiết học, chuyên môn giáo viên và các khung giờ của trường. Mỗi cặp lớp–môn có một giáo viên đủ chuyên môn. Bộ giải tránh trùng lịch, loại tiết đã chặn theo lớp hoặc giáo viên và buộc mỗi giáo viên đạt số tiết tối thiểu đã cấu hình. Khung giờ học được phép để trống khi lớp đã đủ số tiết hoặc khi cần để thỏa các ràng buộc.
+Ở [trang xếp lịch](http://localhost:8000/timetable), bấm **Tạo thời khóa biểu**. Bộ giải tạo một tuần mẫu từ nhu cầu tiết học, chuyên môn giáo viên và các khung giờ của trường. Mỗi cặp lớp–môn có một giáo viên đủ chuyên môn. Bộ giải tránh trùng lịch, loại tiết đã chặn theo lớp hoặc giáo viên và buộc mỗi giáo viên đạt số tiết tối thiểu đã cấu hình. Khung giờ học được phép để trống khi lớp đã đủ số tiết hoặc khi cần để thỏa các ràng buộc. Trong các lịch hợp lệ, bộ giải chọn lịch có ít tiết trống của giáo viên nhất. Tiết trống là tiết giáo viên rảnh nhưng nằm giữa hai tiết có dạy trong cùng một buổi, ví dụ dạy tiết 1 và tiết 4 thì có 2 tiết trống. Tiết giáo viên đã báo bận không tính là tiết trống. Bảng số tiết giáo viên có thêm cột **Tiết trống**.
 
 Ứng dụng áp tuần mẫu cho cả học kỳ và bỏ các tiết rơi vào ngày nghỉ cố định. Hiện chưa tự xếp tiết học bù hoặc giải lại lịch riêng cho tuần có ngày nghỉ.
 
